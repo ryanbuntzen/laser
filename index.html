@@ -1,0 +1,1717 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="T">
+<link rel="apple-touch-icon" href="/icon.png">
+<link rel="icon" href="/icon.png">
+<title>laser</title>
+<script src="https://accounts.google.com/gsi/client" async defer onload="gReady()"></script>
+<style>
+:root{--bg:#1c1c1c;--fg:#efefef;--dim:#9a9a9a;--line:#2f2f2f;--card:#262626;--acc:#dc4c3e;--red:#d1453b}
+@media(prefers-color-scheme:light){:root{--bg:#fff;--fg:#202020;--dim:#7c7c7c;--line:#ececec;--card:#faf9f8}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+/* long-press must open the menu, not start a selection or an iOS callout */
+body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+input,textarea,select{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}
+body{margin:0;background:var(--bg);color:var(--fg);overscroll-behavior-y:contain;touch-action:manipulation;
+ font:16px/1.4 -apple-system,BlinkMacSystemFont,system-ui,sans-serif}
+button,input,textarea,select{font:inherit;color:var(--fg)}
+.pad{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}
+header{position:relative;top:0;background:var(--bg);z-index:5;padding:calc(env(safe-area-inset-top) + 6px) 16px 8px}
+h1{font-size:29px;font-weight:800;letter-spacing:-.6px;margin:0;cursor:pointer;display:inline-block}
+h1:after{content:' \2304';color:var(--dim);font-size:16px;font-weight:400;vertical-align:middle}
+#sub{font-size:13px;font-weight:600;color:var(--dim);margin-top:1px}
+#gear{position:absolute;right:16px;top:calc(env(safe-area-inset-top) + 12px)}
+.gearico{width:19px;height:19px;margin:0}
+.qrow{display:flex;align-items:center;gap:14px;width:100%;padding:13px 2px;background:none;border:0;
+ border-bottom:1px solid var(--line);cursor:pointer;font-size:15px;color:var(--fg);transition:.12s}
+.qrow:active{background:color-mix(in srgb, var(--fg) 7%, transparent)}
+.qrow i{width:22px;text-align:center;font-style:normal;font-size:16px}
+.qrow span{flex:1;text-align:left}
+.qrow b{color:var(--dim);font-weight:600;font-size:13px}
+.calhead{display:flex;align-items:center;justify-content:space-between;margin:2px 0 12px}
+.calhead b{font-size:16px;font-weight:700}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:20px}
+.cw{text-align:center;font-size:10px;font-weight:700;color:var(--dim);padding-bottom:3px}
+.cd{position:relative;aspect-ratio:1;border:0;background:none;color:var(--fg);font-size:14px;
+ font-weight:600;border-radius:10px;cursor:pointer;transition:.12s}
+.cd:active{transform:scale(.88)}
+.cd.off{color:color-mix(in srgb, var(--dim) 50%, transparent)}
+.cd.today{color:var(--acc);font-weight:800}
+.cd.rec{border:1px dashed color-mix(in srgb, var(--fg) 45%, transparent);border-radius:50%}
+.cd.sel{background:color-mix(in srgb, var(--acc) 20%, transparent);box-shadow:inset 0 0 0 1px var(--acc)}
+.cd i{position:absolute;left:50%;bottom:5px;transform:translateX(-50%);width:5px;height:5px;border-radius:50%}
+main{padding:0 16px 140px;max-width:640px;margin:0 auto;min-height:calc(100svh - 60px)}
+/* feedback */
+#bar{position:fixed;top:0;left:0;height:2.5px;width:0;background:var(--acc);z-index:60;opacity:0;
+ transition:width .3s ease,opacity .3s}
+#bar.on{opacity:1}
+#toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 96px);z-index:50;pointer-events:none;
+ background:var(--fg);color:var(--bg);padding:9px 17px;border-radius:20px;font-size:13px;font-weight:700;
+ opacity:0;transform:translateX(-50%) translateY(14px);transition:.22s}
+#toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+/* rows */
+.t{display:flex;gap:12px;align-items:flex-start;padding:13px 0;border-bottom:1px solid var(--line);
+ position:relative;transition:opacity .25s,transform .25s,background .12s}
+.t:active{background:color-mix(in srgb, var(--fg) 5%, transparent)}
+.t.go{opacity:0;transform:translateX(34px)}
+.t.dragging{z-index:20;background:var(--card);box-shadow:0 10px 30px #0009;opacity:.97;
+ transition:none;border-bottom-color:transparent}
+.box{flex:none;width:22px;height:22px;margin-top:1px;border:1.5px solid var(--pc);border-radius:50%;
+ background:color-mix(in srgb, var(--pc) 16%, transparent);cursor:pointer;transition:.15s}
+.box:active{transform:scale(.85)}
+.box.fill{background:var(--pc);box-shadow:inset 0 0 0 2px var(--bg)}
+.body{flex:1;min-width:0;cursor:pointer}
+.c{word-wrap:break-word;overflow-wrap:anywhere}
+.meta{display:flex;gap:7px;align-items:center;font-size:12px;color:var(--dim);margin-top:3px}
+.meta:empty{display:none}
+.meta .od{color:var(--red)}
+.proj{margin-left:auto;white-space:nowrap}
+.proj b{font-weight:700}
+.grip{flex:none;width:38px;margin-right:-10px;align-self:stretch;border:0;background:none;
+ color:var(--dim);font-size:16px;cursor:grab;touch-action:none;-webkit-user-select:none;user-select:none}
+.grip:active{color:var(--fg)}
+.tl{position:relative;margin:8px 0 20px;padding-left:50px}
+.tlh{position:absolute;left:0;right:0;border-top:1px solid var(--line)}
+.tlb{position:absolute;left:50px;right:0;top:0;bottom:0}
+.tlh span{position:absolute;left:0;top:-8px;width:44px;font-size:10px;font-weight:700;color:var(--dim)}
+.tlnow{position:absolute;left:44px;right:0;height:2px;background:var(--acc);z-index:5;border-radius:2px}
+.tlnow:after{content:"";position:absolute;left:-5px;top:-3px;width:8px;height:8px;border-radius:50%;background:var(--acc)}
+.tle{position:absolute;border-radius:9px;padding:5px 9px;overflow:hidden;z-index:2;
+ background:color-mix(in srgb, #5ac8fa 19%, transparent);border-left:3px solid #5ac8fa;
+ transition:box-shadow .2s,background .2s}
+.tle b{display:block;font-size:12.5px;font-weight:700;line-height:1.25;
+ white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tle span{font-size:11px;color:var(--dim)}
+.tle.live{background:color-mix(in srgb, var(--acc) 25%, transparent);border-left-color:var(--acc);
+ box-shadow:0 0 0 1px var(--acc),0 5px 16px #0006;z-index:4}
+.tle.live span{color:var(--fg)}
+.nowcard{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin:10px 0 2px}
+.nowcard.live{border-color:var(--acc)}
+.nowtop{display:flex;gap:10px;align-items:baseline}
+.nowtop b{flex:1;font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nowtop span{font-size:12px;font-weight:700;color:var(--acc);white-space:nowrap}
+.nowcard:not(.live) .nowtop span{color:var(--dim)}
+.nowtime{font-size:12px;color:var(--dim);margin-top:2px}
+.nowbar{height:4px;border-radius:2px;background:color-mix(in srgb, var(--fg) 13%, transparent);margin-top:9px;overflow:hidden}
+.nowbar i{display:block;height:100%;background:var(--acc);border-radius:2px;transition:width .5s linear}
+.allday{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 4px}
+.adchip{background:color-mix(in srgb, #5ac8fa 18%, transparent);border-left:3px solid #5ac8fa;
+ padding:6px 10px;border-radius:8px;font-size:12.5px;font-weight:600}
+.cd u{position:absolute;left:50%;bottom:5px;transform:translateX(-9px);width:5px;height:5px;
+ border-radius:50%;background:#5ac8fa}
+.hdr{display:flex;justify-content:space-between;align-items:baseline;
+     font-size:15px;font-weight:700;color:var(--fg);margin:24px 0 0;padding-bottom:4px}
+.resched{background:none;border:0;padding:0;font:600 15px inherit;color:var(--red)}
+.resched:active{opacity:.5}
+.hdr:first-child{margin-top:6px}
+.tunnel .t{border:0;padding:24px 20px;margin-top:6vh;background:var(--card);border-radius:16px}
+.tunnel .c{font-size:26px;font-weight:600;line-height:1.25}
+.tunnel .box{width:32px;height:32px}
+.tunnel .grip,.tunnel .proj{display:none}
+.meta .blk{color:#4ca9ff;font-variant-numeric:tabular-nums;font-weight:600}
+.empty{text-align:center;color:var(--dim);padding:15vh 0;font-size:17px}
+/* calendar strip */
+.strip{display:flex;gap:5px;overflow-x:auto;padding:4px 0 12px;scrollbar-width:none}
+.strip::-webkit-scrollbar{display:none}
+.day{flex:none;width:43px;padding:6px 0 9px;background:none;border:0;border-radius:11px;color:var(--dim);
+ cursor:pointer;position:relative;transition:.15s}
+.day:active{transform:scale(.94)}
+.day span{display:block;font-size:10px;font-weight:700}
+.day b{display:block;font-size:16px;font-weight:700;color:var(--fg);margin-top:1px}
+.day i{position:absolute;left:50%;bottom:4px;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:var(--acc)}
+.day.now{background:color-mix(in srgb, var(--acc) 15%, transparent)}
+.day.now b,.day.now span{color:var(--acc)}
+/* chrome */
+#err{background:#7f1d1d;color:#fff;padding:11px 14px;font-size:13px;white-space:pre-wrap;word-break:break-word}
+#err:empty{display:none}
+#pull{height:0;overflow:hidden;display:flex;align-items:flex-end;justify-content:center;padding-bottom:6px;
+ font-size:12px;color:var(--dim)}
+#fab{position:fixed;right:20px;bottom:calc(env(safe-area-inset-bottom) + 98px);width:54px;height:54px;
+ border-radius:50%;background:var(--acc);color:#fff;border:0;font-size:29px;line-height:1;padding:0;
+ display:flex;align-items:center;justify-content:center;
+ box-shadow:0 5px 16px #0007;cursor:pointer;z-index:11;transition:.15s}
+#fab:active{transform:scale(.9)}
+nav{position:fixed;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom) + 8px);display:flex;gap:2px;
+ background:color-mix(in srgb, var(--card) 62%, transparent);backdrop-filter:blur(26px) saturate(180%);
+ -webkit-backdrop-filter:blur(26px) saturate(180%);
+ border:1px solid color-mix(in srgb, var(--fg) 11%, transparent);border-radius:27px;padding:6px;z-index:10;
+ box-shadow:0 10px 30px #0006, inset 0 1px 0 color-mix(in srgb, var(--fg) 13%, transparent)}
+nav button{position:relative;flex:1;padding:8px 0 7px;background:none;border:0;color:var(--dim);
+ font-size:10px;font-weight:700;border-radius:21px;cursor:pointer;transition:color .18s,transform .12s}
+nav button:active{transform:scale(.94)}
+.ico{width:23px;height:23px;display:block;margin:0 auto 3px;fill:currentColor}
+nav button[aria-pressed=true]{color:var(--acc);
+ background:color-mix(in srgb, var(--fg) 9%, transparent);
+ box-shadow:inset 0 1px 0 color-mix(in srgb, var(--fg) 28%, transparent), 0 5px 14px #0005}
+/* thin refractive rim on the active lozenge */
+nav button[aria-pressed=true]:before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;
+ background:linear-gradient(125deg,#7fd4ff,rgba(255,255,255,.04) 34%,rgba(255,255,255,.04) 66%,#ff9d7a);
+ -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+ -webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+ mask-composite:exclude;pointer-events:none}
+/* settings */
+.grp{margin-bottom:26px}
+.grp>label{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--dim);margin-bottom:8px}
+.opt{position:relative;overflow:hidden;display:flex;gap:12px;align-items:flex-start;background:var(--card);border:1px solid var(--line);
+ border-radius:11px;padding:13px;margin-bottom:8px;cursor:pointer;transition:.15s}
+.opt:active{transform:scale(.985)}
+.opt[aria-pressed=true]{border-color:var(--acc)}
+.opt .dot{flex:none;width:19px;height:19px;border-radius:50%;border:2px solid var(--dim);margin-top:2px}
+.opt[aria-pressed=true] .dot{border-color:var(--acc);background:var(--acc);box-shadow:inset 0 0 0 3.5px var(--card)}
+.opt b{display:block;font-size:15px}
+.opt:before{content:"";position:absolute;left:0;top:0;bottom:0;width:var(--hold,0%);
+ background:color-mix(in srgb, var(--acc) 30%, transparent);pointer-events:none}
+.opt.locked{border-style:dashed}
+.lockmsg{display:block;font-size:12px;font-weight:700;color:var(--acc);margin-top:3px}
+.opt span{font-size:13px;color:var(--dim)}
+input[type=text],textarea,select{width:100%;padding:11px;background:var(--card);border:1px solid var(--line);
+ border-radius:9px;font-size:15px}
+textarea{resize:vertical;min-height:60px}
+.mono{font-family:ui-monospace,Menlo,monospace;font-size:13px}
+.btn{padding:11px 14px;background:var(--card);border:1px solid var(--line);border-radius:9px;cursor:pointer;transition:.15s}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600}
+.btn.danger{color:var(--red)}
+.row{display:flex;gap:8px}.row>*{flex:1}
+.vbtn{display:block;width:100%;text-align:left;padding:13px;background:var(--card);border:1px solid var(--line);
+ border-radius:11px;margin-bottom:8px;cursor:pointer;transition:.15s}
+.vbtn:active{transform:scale(.985)}
+.vbtn[aria-pressed=true]{border-color:var(--acc);color:var(--acc)}
+.vbtn b{font-weight:800;margin-right:3px}
+.vbtn small{color:var(--dim);font-family:ui-monospace,Menlo,monospace;font-size:12px}
+/* sheets */
+#sheet,#dsheet,#menu{position:fixed;inset:0;background:#0009;z-index:30;display:flex}
+#sheet,#dsheet{align-items:flex-end}
+#dsheet{z-index:35}   /* above the edit sheet, below the long-press menu */
+#menu{align-items:center;justify-content:center;z-index:40}
+.sheetbox{background:var(--bg);width:100%;max-height:92vh;overflow:auto;border-radius:18px 18px 0 0;
+ padding:14px 16px calc(env(safe-area-inset-bottom) + 16px);max-width:640px;margin:0 auto;animation:up .22s cubic-bezier(.2,.8,.2,1)}
+@keyframes up{from{transform:translateY(22px);opacity:.3}to{transform:none;opacity:1}}
+.sheettop{display:flex;justify-content:space-between;margin-bottom:12px}
+.rnd{width:38px;height:38px;border-radius:50%;background:var(--card);border:1px solid var(--line);
+ font-size:17px;cursor:pointer;transition:.15s}
+.rnd:active{transform:scale(.9)}
+.dcard{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:4px 14px;margin-bottom:16px}
+.drow{display:flex;gap:13px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line)}
+.drow:last-child{border-bottom:0}
+.drow .ic{flex:none;width:22px;text-align:center;color:var(--dim);font-size:16px}
+.drow input,.drow select,.drow textarea{background:none;border:0;padding:0;border-radius:0}
+.drow textarea{min-height:26px;font-size:17px;font-weight:600}
+.chips{display:flex;gap:8px;flex-wrap:wrap;padding:12px 0 4px}
+.chip{padding:8px 13px;background:var(--card);border:1px solid var(--line);border-radius:20px;font-size:13px;
+ font-weight:600;cursor:pointer;transition:.15s}
+.chip:active{transform:scale(.95)}
+.chip[aria-pressed=true]{border-color:var(--acc);color:var(--acc)}
+.seg{display:flex;gap:6px;flex:1}
+.seg button{flex:1;padding:8px 0;background:var(--bg);border:1px solid var(--line);border-radius:8px;
+ font-size:13px;font-weight:700;color:var(--dim);cursor:pointer;transition:.15s}
+.seg button:active{transform:scale(.94)}
+.sub{display:flex;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);font-size:14px}
+#sheet.creating .editonly{display:none}
+.hint{display:none;font-size:13px;color:var(--dim);margin:9px 0 2px}
+#sheet.creating .hint{display:block}
+/* long-press menu */
+.menubox{background:var(--card);border:1px solid var(--line);border-radius:16px;min-width:252px;max-width:82vw;
+ overflow:hidden;box-shadow:0 20px 50px #000b;animation:up .16s ease}
+.mi{display:flex;gap:14px;align-items:center;width:100%;padding:14px 18px;background:none;border:0;
+ text-align:left;font-size:16px;cursor:pointer;color:var(--fg)}
+.mi:active{background:color-mix(in srgb, var(--fg) 9%, transparent)}
+.mi.sep{border-top:1px solid var(--line)}
+.mi.del{color:var(--red)}
+.mi i{flex:none;width:20px;text-align:center;color:var(--dim);font-style:normal}
+.mi.del i{color:var(--red)}
+#setup{padding:40px 22px;max-width:520px;margin:0 auto}
+.hide{display:none!important}
+</style>
+
+<div id="bar"></div>
+<div id="toast"></div>
+<div id="err"></div>
+
+<div id="setup" class="hide"><main>
+  <h1 style="cursor:default">todo</h1>
+  <p style="color:var(--dim);font-size:14px">Paste your Todoist API token &mdash; Todoist &rarr; Settings &rarr;
+  Integrations &rarr; Developer. Stored only in this browser, sent only to api.todoist.com.</p>
+  <input type="text" id="tok" placeholder="API token" autocomplete="off" autocapitalize="off" spellcheck="false">
+  <p><button class="btn primary" style="width:100%" onclick="saveTok()">Save</button></p>
+</main></div>
+
+<div id="app" class="hide">
+  <header class="pad"><h1 id="title" onclick="openViews()">Tasks</h1><div id="sub"></div><button id="gear" class="rnd hide" onclick="setTab('settings')" aria-label="Settings"><svg class="ico gearico" viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M3.6 3h16.8a.6.6 0 01.6.6v16.8a.6.6 0 01-.6.6H3.6a.6.6 0 01-.6-.6V3.6a.6.6 0 01.6-.6z M6 8.6h12v2.4H6z M8.7 8.9h2.1v1.8H8.7z M6 13.4h12v2.4H6z M13.2 13.7h2.1v1.8h-2.1z"/></svg></button></header>
+  <div id="pull"></div>
+  <main id="out" class="pad"></main>
+  <button id="fab" onclick="openSheet()" aria-label="Add task"><svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" fill="none"/></svg></button>
+  <nav>
+    <button data-q="today | overdue" onclick="navView('today | overdue')"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M3.6 3h16.8a.6.6 0 01.6.6v16.8a.6.6 0 01-.6.6H3.6a.6.6 0 01-.6-.6V3.6a.6.6 0 01.6-.6z M5.4 9.2h13.2v1.9H5.4z M7.6 5.4h1.7v2.2H7.6z M14.7 5.4h1.7v2.2h-1.7z"/></svg>Today</button>
+    <button data-q="7 days" onclick="navView('7 days')"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M3.6 3h16.8a.6.6 0 01.6.6v16.8a.6.6 0 01-.6.6H3.6a.6.6 0 01-.6-.6V3.6a.6.6 0 01.6-.6z M5.4 7.6h13.2v1.8H5.4z M6.8 11.6h10.4v1.8H6.8z M6.8 15.4h7v1.8h-7z M7.6 5.4h1.7v2.2H7.6z M14.7 5.4h1.7v2.2h-1.7z"/></svg>Upcoming</button>
+    <button data-tab="calendar" onclick="setTab('calendar')"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M3.6 3h16.8a.6.6 0 01.6.6v16.8a.6.6 0 01-.6.6H3.6a.6.6 0 01-.6-.6V3.6a.6.6 0 01.6-.6z M5.4 7.6h13.2v1.8H5.4z M7 12h2.2v2.2H7z M10.9 12h2.2v2.2h-2.2z M14.8 12h2.2v2.2h-2.2z M7 16h2.2v2.2H7z M10.9 16h2.2v2.2h-2.2z M14.8 16h2.2v2.2h-2.2z M7.6 5.4h1.7v2.2H7.6z M14.7 5.4h1.7v2.2h-1.7z"/></svg>Calendar</button>
+    <button data-tab="browse" onclick="setTab('browse')"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M3.6 3h16.8a.6.6 0 01.6.6v16.8a.6.6 0 01-.6.6H3.6a.6.6 0 01-.6-.6V3.6a.6.6 0 01.6-.6z M6.6 8h10.8v1.9H6.6z M6.6 11.9h10.8v1.9H6.6z M6.6 15.8h10.8v1.9H6.6z"/></svg>Browse</button>
+  </nav>
+</div>
+
+<div id="menu" class="hide" onclick="closeMenu()"><div class="menubox" id="menubox" onclick="event.stopPropagation()"></div></div>
+
+<div id="dsheet" class="hide"><div class="sheetbox">
+  <div class="sheettop">
+    <button class="rnd" onclick="closeDate()">&times;</button>
+    <b style="align-self:center;font-size:16px">Date</b>
+    <button class="rnd" onclick="applyDate()">&#10003;</button>
+  </div>
+  <input type="text" id="d_text" placeholder="or type: tomorrow, mon 3pm, every friday"
+         autocapitalize="off" spellcheck="false">
+  <div id="d_quick"></div>
+  <div id="d_cal"></div>
+</div></div>
+
+<div id="sheet" class="hide"><div class="sheetbox">
+  <div class="sheettop">
+    <button class="rnd" onclick="closeSheet()">&times;</button>
+    <button class="rnd editonly" onclick="openMenu(editing && editing.id)">&#8943;</button>
+  </div>
+  <div class="dcard">
+    <div class="drow">
+      <button class="box editonly" id="e_box" style="--pc:var(--dim)" onclick="completeFromSheet()"></button>
+      <textarea id="e_content" placeholder="What needs doing?"></textarea>
+    </div>
+    <div class="drow editonly"><b class="ic" id="e_hash">#</b><select id="e_proj"></select></div>
+    <div class="drow editonly" onclick="openDate()"><span class="ic">&#9638;</span>
+      <span id="e_duetxt" style="flex:1">No date</span><span style="color:var(--dim)">&#8250;</span></div>
+    <input type="hidden" id="e_due">
+    <div class="drow editonly"><span class="ic">&#9873;</span><div class="seg" id="e_prio"></div></div>
+  </div>
+  <div class="chips editonly">
+    <button class="chip" id="c_desc" onclick="toggleExtra('desc')">&#9776; Description</button>
+    <button class="chip" id="c_lab" onclick="toggleExtra('lab')">&#9678; Labels</button>
+  </div>
+  <div id="x_desc" class="hide" style="margin-top:10px"><textarea id="e_desc" placeholder="Description"></textarea></div>
+  <div id="x_lab" class="hide chips"></div>
+  <div class="grp editonly" id="subwrap" style="margin-top:18px">
+    <label>Sub-tasks</label><div id="e_subs"></div>
+    <button class="btn" style="width:100%;margin-top:8px" onclick="addSub()">+ Add sub-task</button>
+  </div>
+  <div class="hint">Type it like Todoist &mdash; <b>buy milk tomorrow p1 #Work</b></div>
+  <div class="row" style="margin-top:14px">
+    <button class="btn" onclick="closeSheet()">Cancel</button>
+    <button class="btn primary" onclick="saveTask()">Save</button>
+  </div>
+</div></div>
+
+<script>
+const API = "https://api.todoist.com/api/v1";
+const LS = {tok:"laser.tok", q:"laser.q", mode:"laser.mode", cache:"laser.cache", order:"laser.order",
+            proj:"laser.projects", group:"laser.group", lab:"laser.labels",
+            gcal:"laser.gcal", ev:"laser.events", modetask:"laser.modetask",
+            win:"laser.win", gcalid:"laser.gcalid"};
+const FMT_MD = new Intl.DateTimeFormat(undefined, {month: "short", day: "numeric"});
+const FMT_WD = new Intl.DateTimeFormat(undefined, {weekday: "long"});
+const FMT_WD1 = new Intl.DateTimeFormat(undefined, {weekday: "narrow"});
+// Local calendar date. toISOString() is UTC, which rolls over mid-evening in
+// California and made tasks read as overdue hours early.
+const iso = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") +
+  "-" + String(d.getDate()).padStart(2, "0");
+const PROJCOL = {berry_red:"#b8256f", red:"#db4035", orange:"#ff9933", yellow:"#fad000",
+  olive_green:"#afb83b", lime_green:"#7ecc49", green:"#299438", mint_green:"#6accbc",
+  teal:"#158fad", sky_blue:"#14aaf5", light_blue:"#96c3eb", blue:"#4073ff", grape:"#884dff",
+  violet:"#af38eb", lavender:"#eb96eb", magenta:"#e05194", salmon:"#ff8d85",
+  charcoal:"#808080", grey:"#b8b8b8", taupe:"#ccac93"};
+const PCOL = {4:"#d1453b", 3:"#eb8909", 2:"#246fe0", 1:"var(--dim)"};
+const PNAME = {4:"P1", 3:"P2", 2:"P3", 1:"P4"};
+const DEFAULT_Q = "today | overdue";
+// [label, filter query, colour, marker]
+function browseCats() {
+  return [
+    ["Dates", [["Today", DEFAULT_Q, "", ""], ["Upcoming", "7 days", "", ""],
+               ["Next 30 days", "next 30 days", "", ""], ["Overdue", "overdue", "var(--red)", ""],
+               ["No date", "no date", "", ""]]],
+    ["Priority", [["Priority 1", "p1", PCOL[4], "\u2691"], ["Priority 2", "p2", PCOL[3], "\u2691"],
+                  ["Priority 3", "p3", PCOL[2], "\u2691"], ["Priority 4", "p4", PCOL[1], "\u2691"]]],
+    ["Projects", projects.map(x => [x.name, "#" + x.name, PROJCOL[x.color] || "var(--dim)", "#"])],
+    ["Labels", labels.map(x => [x.name, "@" + x.name, PROJCOL[x.color] || "var(--dim)", "@"])],
+    ["Everything", [["All tasks", "all", "", ""]]]
+  ];
+}
+const allViews = () => browseCats().flatMap(([, rows]) => rows);
+
+let tasks = [], projects = [], labels = [], projMap = {}, viewRows = [];
+let editing = null, editPrio = 1, editDueOrig = "", editProjOrig = "", editLabels = [];
+let mode = localStorage.getItem(LS.mode) || "all";
+let group = localStorage.getItem(LS.group) || "auto";
+let tab = "tasks";
+
+const $ = id => document.getElementById(id);
+const prio = t => t.priority || 1;
+const uid = () => crypto.randomUUID();
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const setProjects = list => { projects = list; projMap = Object.fromEntries(list.map(x => [x.id, {n: x.name, c: x.color}])); };
+const err = m => { $("err").textContent = m || ""; if (m) window.scrollTo(0, 0); };
+
+let toastT = null;
+function toast(m) {
+  $("toast").textContent = m;
+  $("toast").classList.add("on");
+  clearTimeout(toastT);
+  toastT = setTimeout(() => $("toast").classList.remove("on"), 1600);
+}
+
+// Every request drives the top bar, so the app never looks frozen.
+let inflight = 0;
+function bump(d) {
+  inflight = Math.max(0, inflight + d);
+  const b = $("bar");
+  if (inflight > 0) { b.classList.add("on"); b.style.width = "72%"; }
+  else { b.style.width = "100%"; setTimeout(() => { b.classList.remove("on"); b.style.width = "0"; }, 280); }
+}
+
+async function api(path, opts = {}) {
+  bump(1);
+  try {
+    const r = await fetch(API + path, {...opts, headers: {
+      Authorization: "Bearer " + localStorage.getItem(LS.tok), "Content-Type": "application/json"}});
+    if (r.status === 401) { logout(); throw new Error("Token rejected (401). Paste it again."); }
+    if (!r.ok) throw new Error(r.status + " " + r.statusText + " on " + path + "\n" + (await r.text()).slice(0, 300));
+    return r.status === 204 ? null : r.json();
+  } finally { bump(-1); }
+}
+
+/* ---------- ordering (covered by ?selftest) ---------- */
+
+const getOrder = () => { try { return JSON.parse(localStorage.getItem(LS.order) || "[]"); } catch { return []; } };
+
+// ponytail: the manual order lives in localStorage, not in Todoist. Verified twice that
+// /tasks/filter ignores both child_order and day_order, so a server-side reorder would
+// silently revert on the next refresh. Cost: the order is per-device.
+function saveOrder(ids) {
+  const rest = getOrder().filter(id => !ids.includes(id));
+  localStorage.setItem(LS.order, JSON.stringify([...ids, ...rest]));
+}
+
+const byPriority = (list, order) => {
+  const at = Object.fromEntries(order.map((id, i) => [id, i]));
+  const rank = t => at[String(t.id)] ?? Infinity;
+  return [...list].sort((a, b) => prio(b) - prio(a) || rank(a) - rank(b));
+};
+
+const dkey = t => ((t.due && t.due.date) || "9999-12-31").slice(0, 10);
+
+const byDate = (list, order) => {
+  const at = Object.fromEntries(order.map((id, i) => [id, i]));
+  const rank = t => at[String(t.id)] ?? Infinity;
+  return [...list].sort((a, b) => dkey(a).localeCompare(dkey(b)) || prio(b) - prio(a) || rank(a) - rank(b));
+};
+
+const _dh = new Map();   // cleared on load(); Intl formatting per row was the slow part
+function dayHeader(d) {
+  const k = d ? d.slice(0, 10) : "x";
+  if (!_dh.has(k)) _dh.set(k, dayHeaderRaw(d));
+  return _dh.get(k);
+}
+function dayHeaderRaw(d) {
+  if (!d) return "No date";
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const x = new Date(d.slice(0, 10) + "T00:00:00");
+  const diff = Math.round((x - today) / 86400000);
+  if (diff < 0) return "Overdue";
+  return FMT_MD.format(x) + " · " +
+    (diff === 0 ? "Today · " : diff === 1 ? "Tomorrow · " : "") + FMT_WD.format(x);
+}
+
+// ponytail: decide grouping from the tasks, not by parsing the filter string.
+// One day on screen -> priority tiers. Several -> a section per day, like Todoist.
+function effGroup(list) {
+  if (group !== "auto") return group;
+  return new Set(list.filter(t => t.due).map(dkey)).size > 1 ? "date" : "priority";
+}
+
+const overdue = (t, today) => !!(t.due && t.due.date && t.due.date.slice(0, 10) < today);
+
+/* ---------- auto time-blocking ---------- */
+
+// Todoist carries a duration on the task itself, so the plan does not need a second
+// store. Anything without one is assumed to be half an hour.
+const DEF_MINS = 30, MIN_BLOCK = 15;
+// Transition time around anything fixed: walking there, walking back, settling in.
+const PAD = 15;
+const taskMins = t => {
+  const d = t && t.duration;
+  // ponytail: only the "minute" unit is packed. A day-long task is a commitment, not a
+  // block, and pretending otherwise would eat the whole plan.
+  return d && d.unit === "minute" && +d.amount > 0 ? +d.amount : DEF_MINS;
+};
+
+const nowMins = (d = new Date()) => d.getHours() * 60 + d.getMinutes();
+
+const dayWindow = () => {
+  try { const w = JSON.parse(localStorage.getItem(LS.win) || ""); if (Array.isArray(w) && w.length === 2) return w; } catch {}
+  return [9 * 60, 18 * 60];
+};
+
+// What is left of the waking window once the day's real events are removed.
+// Every commitment is widened by PAD on both sides: you cannot start a task the second
+// a class ends, you have to get there and back. Padding here rather than in the event
+// keeps the calendar honest about when things actually happen.
+function freeGaps(evs, win, pad = 0) {
+  const [lo, hi] = win;
+  const busy = evs.map(e => ({s: e.s - pad, en: e.en + pad}))
+                  .filter(e => e.en > lo && e.s < hi).sort((a, b) => a.s - b.s);
+  const out = [];
+  let at = lo;
+  for (const e of busy) {
+    if (e.s > at) out.push({s: at, en: Math.min(e.s, hi)});
+    at = Math.max(at, e.en);
+    if (at >= hi) break;
+  }
+  if (at < hi) out.push({s: at, en: hi});
+  return out.filter(g => g.en - g.s >= MIN_BLOCK);
+}
+
+// Pack tasks into those gaps in the order they are already sorted. A task that will not
+// fit the gap it lands in moves to the next one whole -- splitting a task across a
+// meeting is how a plan stops matching what you actually do.
+function planDay(list, gaps) {
+  const blocks = gaps.map(g => ({s: g.s, en: g.en, tasks: []}));
+  let i = 0, at = blocks.length ? blocks[0].s : 0;
+  for (const t of list) {
+    const need = taskMins(t);
+    while (i < blocks.length && at + need > blocks[i].en) { i++; if (i < blocks.length) at = blocks[i].s; }
+    if (i >= blocks.length) break;        // day is full; everything after this is unplanned
+    blocks[i].tasks.push({id: String(t.id), s: at, en: at + need});
+    at += need;
+  }
+  return blocks.filter(b => b.tasks.length);
+}
+
+const mm2t = m => FMT_T.format(new Date(2000, 0, 1, Math.floor(m / 60), m % 60));
+const slotMap = plan => Object.fromEntries(plan.flatMap(b => b.tasks.map(x => [x.id, x])));
+const blockAt = (plan, mins) => plan.find(b => b.s <= mins && mins < b.en) || null;
+
+// Today's plan, built from the unfiltered list so it does not change with the mode.
+function todayPlan(list = tasks, today = iso(new Date())) {
+  const evs = eventsOn(today).filter(e => !e.allDay)
+    .map(e => ({s: evMins(e.start), en: e.end ? evMins(e.end) : evMins(e.start) + 60}));
+  const [lo, hi] = dayWindow();
+  const win = evs.length ? [Math.min(lo, ...evs.map(e => e.s)), Math.max(hi, ...evs.map(e => e.en))] : [lo, hi];
+  const due = list.filter(t => !t.due || dkey(t) <= today);   // today + overdue, never future
+  return planDay(view(due, "all", getOrder(), effGroup(due), today), freeGaps(evs, win, PAD));
+}
+
+// Laser hides everything below the top tier -- except what is already late. An overdue
+// task you cannot see is one you cannot reschedule, so it rides along until it is dated
+// forward, at which point the normal tier filter swallows it again.
+function view(list, mode, order = getOrder(), g = effGroup(list), today = iso(new Date()),
+              plan = null, mins = null) {
+  const r = g === "date" ? byDate(list, order) : byPriority(list, order);
+
+  // With a plan, focus is defined by the clock instead of by priority tier:
+  // tunnel = the block you are in, laser = that block plus whatever earlier blocks
+  // you did not finish. Still open means still on the list, so no extra bookkeeping.
+  if (plan && plan.length) {
+    const at = mins == null ? nowMins() : mins;
+    const cur = blockAt(plan, at);
+    const keep = new Set();
+    if (cur) cur.tasks.forEach(x => keep.add(x.id));
+    if (mode === "laser") for (const b of plan) if (b.en <= at) b.tasks.forEach(x => keep.add(x.id));
+    if (mode === "tunnel" || mode === "laser") return r.filter(t => keep.has(String(t.id)));
+  }
+
+  if (mode === "tunnel") return r.slice(0, 1);
+  if (mode === "laser") {
+    const late = r.filter(t => overdue(t, today)), rest = r.filter(t => !overdue(t, today));
+    if (!rest.length) return late;
+    const top = Math.max(...rest.map(prio));
+    return [...late, ...rest.filter(t => prio(t) === top)];
+  }
+  return r;
+}
+
+/* ---------- render ---------- */
+
+function render() {
+  const curq = localStorage.getItem(LS.q) || DEFAULT_Q;
+  document.querySelectorAll("nav button").forEach(b => b.setAttribute("aria-pressed",
+    b.dataset.tab ? tab === b.dataset.tab : tab === "tasks" && b.dataset.q === curq));
+  $("fab").classList.toggle("hide", tab === "browse" || tab === "settings");
+  $("gear").classList.toggle("hide", tab !== "browse");
+  tab === "settings" ? renderSettings() : tab === "browse" ? renderBrowse()
+    : tab === "calendar" ? renderCal() : renderTasks();
+}
+
+function renderTasks() {
+  const q = localStorage.getItem(LS.q) || DEFAULT_Q;
+  const g = effGroup(tasks);
+  const now = new Date(), TODAY = iso(now);
+  const plan = todayPlan(tasks, TODAY), slots = slotMap(plan);
+  const cur = blockAt(plan, nowMins(now));
+  const shown = view(tasks, mode, getOrder(), g, TODAY, plan);
+  const named = allViews().find(v => v[1] === q);
+  const vname = named ? named[0] : q;
+  $("title").textContent = mode === "all" ? vname : ({laser: "Laser", tunnel: "Tunnel"})[mode];
+  $("sub").textContent = mode !== "all"
+    ? (cur ? "Block " + mm2t(cur.s) + "–" + mm2t(cur.en) : "Between blocks") + " · " + shown.length + " shown"
+    : q === DEFAULT_Q ? FMT_MD.format(now) + " · " + FMT_WD.format(now)
+    : shown.length + (shown.length === 1 ? " task" : " tasks");
+  $("out").classList.toggle("tunnel", mode === "tunnel");
+  $("out").id = "out";
+
+  if (!shown.length) {
+    const why = !tasks.length ? "All clear."
+      : mode !== "all" && plan.length && !cur ? "Nothing blocked right now — you are inside a calendar event."
+      : mode !== "all" && !plan.length ? "No plan today — connect the calendar, or nothing is due."
+      : "&#10003; nothing at this level";
+    $("out").innerHTML = '<div class="empty">' + why + "</div>";
+    return;
+  }
+  const drag = mode !== "tunnel";
+  let section = null, html = "";
+  if (q === DEFAULT_Q && mode !== "tunnel") html += nowCardHTML();
+
+  if (g === "date" && mode === "all") {
+    const counts = {};
+    for (const t of shown) if (t.due) counts[dkey(t)] = (counts[dkey(t)] || 0) + 1;
+    html += '<div class="strip">';
+    for (let i = 0; i < 14; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i), k = iso(d);
+      html += '<button class="day' + (i ? "" : " now") + '" onclick="jump(\'' + k + '\')">' +
+        "<span>" + FMT_WD1.format(d) + "</span><b>" + d.getDate() + "</b>" +
+        (counts[k] ? "<i></i>" : "") + "</button>";
+    }
+    html += "</div>";
+  }
+
+  for (const t of shown) {
+    const label = g === "date" ? dayHeader(t.due && t.due.date) : PNAME[prio(t)];
+    if (mode !== "tunnel" && label !== section) {
+      html += '<div class="hdr" id="d-' + (t.due ? dkey(t) : "none") + '">' + esc(label) +
+        (label === "Overdue" ? '<button class="resched" onclick="openBulkDate()">Reschedule</button>' : "") +
+        "</div>";
+      section = label;
+    }
+    html += taskRow(t, drag, g === "date", TODAY, g === "date" ? dkey(t) : "", slots[String(t.id)]);
+  }
+  $("out").innerHTML = '<div id="list">' + html + "</div>";
+}
+
+function taskRow(t, drag, hideDue, today, dayk, slot) {
+  const p = prio(t);
+  const due = t.due ? (t.due.string || FMT_MD.format(new Date(t.due.date.slice(0, 10) + "T00:00:00"))) : "";
+  const od = t.due && t.due.date && t.due.date.slice(0, 10) < today;
+  const pj = projMap[t.project_id];
+  return '<div class="t" style="--pc:' + PCOL[p] + '" data-id="' + t.id + '" data-k="' + dayk + "|" + p + '">' +
+    '<button class="box" onclick="done(this)" aria-label="Complete"></button>' +
+    '<div class="body" onpointerdown="pressStart(event,\'' + t.id + '\')" onpointerup="pressEnd()" ' +
+      'onpointermove="pressEnd()" onpointercancel="pressEnd()" onclick="bodyTap(\'' + t.id + '\')">' +
+      '<div class="c">' + esc(t.content) + "</div>" +
+    '<div class="meta">' +
+      (slot ? '<span class="blk">' + mm2t(slot.s) + "</span>" : "") +
+      (t.due && t.due.is_recurring ? "\u21bb " : "") +
+      (hideDue ? "" : (due ? '<span class="' + (od ? "od" : "") + '">' + esc(due) + "</span>" : "")) +
+      (t.description ? "note" : "") +
+      (t.labels && t.labels.length ? "@" + t.labels.length : "") +
+      (pj ? '<span class="proj">' + esc(pj.n) + ' <b style="color:' +
+            (PROJCOL[pj.c] || "var(--dim)") + '">#</b></span>' : "") +
+    "</div></div>" +
+    (drag ? '<button class="grip" onpointerdown="dragStart(event,this)" aria-label="Reorder">&#8942;&#8942;</button>' : "") +
+    "</div>";
+}
+
+/* ---------- google calendar (read only) ---------- */
+
+// Your own Google OAuth *browser* client id, kept out of the repo. Set it once:
+//   localStorage.setItem("laser.gcalid", "<id>.apps.googleusercontent.com")
+// then reload. See README for how to make one.
+const GCAL_ID = localStorage.getItem(LS.gcalid) || "";
+// calendar.events grants read AND write on events (not calendar management).
+// A client left in Testing needs no Data Access registration -- any listed
+// test user can consent to this scope directly.
+const GCAL_SCOPE = "https://www.googleapis.com/auth/calendar.events";
+let gToken = null, gClient = null, events = [];
+
+const evDay = e => e.start.slice(0, 10);
+const FMT_T = new Intl.DateTimeFormat(undefined, {hour: "numeric", minute: "2-digit"});
+const evTime = iso8601 => FMT_T.format(new Date(iso8601));
+
+function gReady() {
+  if (gClient || !GCAL_ID || !window.google || !google.accounts) return;
+  gClient = google.accounts.oauth2.initTokenClient({
+    client_id: GCAL_ID, scope: GCAL_SCOPE,
+    callback: r => {
+      if (!r || !r.access_token) { err("Google sign-in returned no token."); return; }
+      gToken = r.access_token;
+      localStorage.setItem(LS.gcal, "1");
+      loadEvents();
+    },
+    error_callback: e => {
+      // popup_failed_to_open just means no user gesture; popup_closed means they backed out.
+      if (e && e.type !== "popup_closed" && e.type !== "popup_failed_to_open")
+        err("Google: " + (e.type || "sign-in failed"));
+    }
+  });
+}
+
+function gConnect() {
+  if (!GCAL_ID) { err("No Google client id set. See README: localStorage laser.gcalid"); return; }
+  if (!gClient) { err("Google script did not load. Check the connection and reopen."); return; }
+  gClient.requestAccessToken({});
+}
+function gDisconnect() {
+  if (gToken && window.google) google.accounts.oauth2.revoke(gToken, () => {});
+  gToken = null; events = [];
+  localStorage.removeItem(LS.gcal); localStorage.removeItem(LS.ev);
+  render(); toast("Calendar disconnected");
+}
+
+let gLastLoad = 0;
+
+// Refreshing needs a user gesture, so it rides on opening the Calendar tab
+// rather than firing at load time where Safari would block the popup.
+function gMaybeRefresh() {
+  if (!localStorage.getItem(LS.gcal) || !gClient) return;
+  if (gToken && Date.now() - gLastLoad < 30 * 60 * 1000) return;
+  gClient.requestAccessToken({prompt: ""});
+}
+
+async function loadEvents() {
+  if (!gToken) return;
+  const n = new Date();
+  const min = new Date(n.getFullYear(), n.getMonth() - 1, 1).toISOString();
+  const max = new Date(n.getFullYear(), n.getMonth() + 2, 1).toISOString();
+  bump(1);
+  try {
+    const r = await fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events" +
+      "?singleEvents=true&orderBy=startTime&maxResults=2500" +
+      "&timeMin=" + encodeURIComponent(min) + "&timeMax=" + encodeURIComponent(max),
+      {headers: {Authorization: "Bearer " + gToken}});
+    if (r.status === 401) { gToken = null; return; }          // expired; silent retry next open
+    if (!r.ok) throw new Error("Calendar " + r.status + " " + (await r.text()).slice(0, 160));
+    const d = await r.json();
+    events = (d.items || []).filter(e => e.start).map(e => ({
+      title: e.summary || "(no title)",
+      start: e.start.dateTime || e.start.date,
+      end: e.end && (e.end.dateTime || e.end.date) || null,
+      allDay: !e.start.dateTime
+    }));
+    localStorage.setItem(LS.ev, JSON.stringify(events));
+    gLastLoad = Date.now();
+    render();
+  } catch (e) { err(e.message); } finally { bump(-1); }
+}
+
+// Which event is happening now, or the next one today. Pure so ?selftest can check it.
+function nowState(list, mins) {
+  // `mins < e.en` alone drops a zero-length event: it is never live and never next.
+  const live = list.find(e => e.s <= mins && (mins < e.en || e.en <= e.s));
+  const next = live ? null : list.filter(e => e.s > mins).sort((a, b) => a.s - b.s)[0];
+  const e = live || next;
+  if (!e) return null;
+  const span = e.en - e.s;
+  return {
+    e: e,
+    live: !!live,
+    pct: live ? (span > 0 ? Math.max(0, Math.min(100, ((mins - e.s) / span) * 100)) : 100) : 0,
+    left: live ? e.en - mins : e.s - mins
+  };
+}
+
+const durLabel = n => n >= 60 ? Math.floor(n / 60) + "h " + (n % 60) + "m" : n + "m";
+
+const eventsOn = k => events.filter(e => evDay(e) === k).sort((a, b) => a.start.localeCompare(b.start));
+
+const evMins = t => { const d = new Date(t); return d.getHours() * 60 + d.getMinutes(); };
+
+// Pack overlapping events into side-by-side lanes, one cluster at a time, so a single
+// double-booking does not squeeze the whole day.
+function layoutDay(list) {
+  const evs = list.map(e => ({...e, s: evMins(e.start), en: e.end ? evMins(e.end) : evMins(e.start) + 60}))
+                  .sort((a, b) => a.s - b.s || a.en - b.en);
+  const out = [];
+  let i = 0;
+  while (i < evs.length) {
+    let j = i, maxEnd = evs[i].en;
+    while (j + 1 < evs.length && evs[j + 1].s < maxEnd) { j++; maxEnd = Math.max(maxEnd, evs[j].en); }
+    const cluster = evs.slice(i, j + 1), lanes = [];
+    for (const ev of cluster) {
+      let L = lanes.findIndex(end => end <= ev.s);
+      if (L === -1) { L = lanes.length; lanes.push(ev.en); } else lanes[L] = ev.en;
+      ev.lane = L;
+    }
+    for (const ev of cluster) { ev.lanes = lanes.length; out.push(ev); }
+    i = j + 1;
+  }
+  return out;
+}
+
+// The window follows the day's actual events instead of always drawing midnight to midnight.
+function dayRange(evs) {
+  if (!evs.length) return [8 * 60, 20 * 60];
+  const lo = Math.min(...evs.map(e => e.s)), hi = Math.max(...evs.map(e => e.en));
+  return [Math.max(0, Math.floor((lo - 30) / 60) * 60), Math.min(1440, Math.ceil((hi + 30) / 60) * 60)];
+}
+
+const PPM = 1.05;   // pixels per minute
+
+function nowCardHTML() {
+  const now = new Date();
+  const mins = now.getHours() * 60 + now.getMinutes();
+  const list = eventsOn(iso(now)).filter(e => !e.allDay).map(e => ({
+    title: e.title, start: e.start, end: e.end,
+    s: evMins(e.start), en: e.end ? evMins(e.end) : evMins(e.start) + 60
+  }));
+  const st = nowState(list, mins);
+  if (!st) return "";
+  const e = st.e;
+  return '<div class="nowcard' + (st.live ? " live" : "") + '">' +
+    '<div class="nowtop"><b>' + esc(e.title) + "</b><span>" +
+    (st.live ? durLabel(st.left) + " left" : "in " + durLabel(st.left)) + "</span></div>" +
+    '<div class="nowtime">' + evTime(e.start) + (e.end ? "\u2013" + evTime(e.end) : "") + "</div>" +
+    '<div class="nowbar"><i style="width:' + st.pct.toFixed(1) + '%"></i></div></div>';
+}
+
+function eventsHTML(k) {
+  const all = eventsOn(k);
+  if (!all.length) return "";
+  const timed = layoutDay(all.filter(e => !e.allDay));
+  let html = "";
+
+  const allday = all.filter(e => e.allDay);
+  if (allday.length)
+    html += '<div class="allday">' + allday.map(e => '<div class="adchip">' + esc(e.title) + "</div>").join("") + "</div>";
+  if (!timed.length) return html;
+
+  const [lo, hi] = dayRange(timed);
+  const H = (hi - lo) * PPM;
+  const now = new Date(), isToday = k === iso(now), nowMin = now.getHours() * 60 + now.getMinutes();
+
+  html += '<div class="tl" style="height:' + H + 'px">';
+  for (let m = lo; m <= hi; m += 60) {
+    const d = new Date(2000, 0, 1, Math.floor(m / 60), 0);
+    html += '<div class="tlh" style="top:' + (m - lo) * PPM + 'px"><span>' +
+      d.toLocaleTimeString(undefined, {hour: "numeric"}) + "</span></div>";
+  }
+  html += '<div class="tlb">';
+  for (const e of timed) {
+    const live = isToday && e.s <= nowMin && nowMin < e.en;
+    const w = 100 / e.lanes;
+    html += '<div class="tle' + (live ? " live" : "") + '" style="top:' + (e.s - lo) * PPM +
+      "px;height:" + Math.max((e.en - e.s) * PPM - 3, 26) + "px;left:" + (e.lane * w) +
+      "%;width:calc(" + w + "% - 5px)\">" +
+      "<b>" + esc(e.title) + "</b><span>" + evTime(e.start) +
+      (e.end ? "\u2013" + evTime(e.end) : "") + "</span></div>";
+  }
+  html += "</div>";
+  if (isToday && nowMin >= lo && nowMin <= hi)
+    html += '<div class="tlnow" style="top:' + (nowMin - lo) * PPM + 'px"></div>';
+  return html + "</div>";
+}
+
+/* ---------- calendar ---------- */
+
+// ponytail: one "all" fetch feeds every month. 156 tasks today against a 200 cap;
+// past that it truncates and months would go sparse. Upgrade: per-month date filters.
+let calTasks = [], calMonth = null, calSel = null;
+const calStart = (y, m) => { const f = new Date(y, m, 1); return new Date(y, m, 1 - f.getDay()); };
+
+async function loadCal() {
+  try {
+    const d = await api("/tasks/filter?limit=200&query=all");
+    calTasks = d.results || [];
+    renderCal();
+  } catch (e) { err(e.message); }
+}
+
+function renderCal() {
+  const now = new Date(), TODAY = iso(now);
+  if (!calMonth) calMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  if (!calSel) calSel = TODAY;
+  const y = calMonth.getFullYear(), m = calMonth.getMonth();
+  $("title").textContent = "Calendar";
+  const nev = eventsOn(calSel).length;
+  $("sub").textContent = nev + (nev === 1 ? " event" : " events");
+  $("out").classList.remove("tunnel");
+
+  // Task dots still mark days that carry work; the task list itself lives in the other tabs.
+  const byDay = {};
+  for (const t of calTasks) if (t.due) (byDay[dkey(t)] = byDay[dkey(t)] || []).push(t);
+
+  let html = '<div class="hdr" style="margin-top:6px">' + esc(dayHeader(calSel)) + "</div>";
+  html += eventsHTML(calSel) ||
+    '<div style="color:var(--dim);padding:8px 0 16px;font-size:14px">' +
+    (localStorage.getItem(LS.gcal) ? "Nothing scheduled." : "Connect Google Calendar in Settings.") + "</div>";
+
+  html += '<div class="calhead"><button class="rnd" onclick="calNav(-1)">&#8249;</button><b>' +
+    esc(calMonth.toLocaleDateString(undefined, {month: "long", year: "numeric"})) +
+    '</b><button class="rnd" onclick="calNav(1)">&#8250;</button></div><div class="cal">';
+  for (const w of ["S", "M", "T", "W", "T", "F", "S"]) html += '<div class="cw">' + w + "</div>";
+  const st = calStart(y, m);
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(st.getFullYear(), st.getMonth(), st.getDate() + i), k = iso(d);
+    const list = byDay[k] || [];
+    html += '<button class="cd' + (d.getMonth() !== m ? " off" : "") + (k === TODAY ? " today" : "") +
+      (k === calSel ? " sel" : "") + '" onclick="calPick(\'' + k + '\')">' + d.getDate() +
+      (list.length ? '<i style="background:' + PCOL[Math.max(...list.map(prio))] + '"></i>' : "") +
+      (eventsOn(k).length ? "<u></u>" : "") + "</button>";
+  }
+  html += "</div>";
+  $("out").innerHTML = html;
+}
+setInterval(() => {
+  if (tab === "calendar") renderCal();
+  else if (tab === "tasks" && events.length) render();   // keeps the now-card progress current
+}, 60000);
+
+function calNav(n) { calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() + n, 1); renderCal(); }
+function calPick(k) { calSel = k; renderCal(); }
+
+function jump(k) {
+  const el = document.getElementById("d-" + k);
+  if (!el) { toast("Nothing on that day"); return; }
+  // The header is sticky, so block:"start" parks the section underneath it.
+  // Measure it instead of guessing: its height moves with the safe-area inset.
+  const head = document.querySelector("header").getBoundingClientRect().height;
+  const top = el.getBoundingClientRect().top + window.scrollY - head - 8;
+  window.scrollTo({top: Math.max(0, top), behavior: "smooth"});
+}
+
+function renderSettings() {
+  const q = localStorage.getItem(LS.q) || DEFAULT_Q;
+  const M = [["all", "All", "Everything in your filter, in your order."],
+             ["laser", "Laser focus", "Only the highest priority level present right now. Clear the P1s and it becomes your P2 list."],
+             ["tunnel", "Tunnel vision", "The single next task. Nothing else on screen."]];
+  const G = [["auto", "Auto", "One day on screen groups by priority; several groups by day."],
+             ["priority", "Priority", "P1 first. Drag the handle to reorder inside a tier."],
+             ["date", "Date", "Overdue, Today, Tomorrow, then each upcoming day."]];
+  $("title").textContent = "Settings";
+  $("sub").textContent = "";
+  $("out").classList.remove("tunnel");
+  $("out").innerHTML =
+    '<div class="grp"><label>Focus mode</label>' +
+    M.map(([k, n, d]) => {
+      const lock = needsHold(mode, k);
+      return '<div class="opt' + (lock ? " locked" : "") + '" aria-pressed="' + (mode === k) +
+        '" onpointerdown="modePress(event,\'' + k + '\')" onpointerup="modeCancel(this)"' +
+        ' onpointerleave="modeCancel(this)" onpointercancel="modeCancel(this)">' +
+        '<div class="dot"></div><div><b>' + n + "</b><span>" + d + "</span>" +
+        (lock ? '<span class="lockmsg">' + LOCK_LABEL + "</span>" : "") + "</div></div>";
+    }).join("") +
+    '</div><div class="grp"><label>Group by</label>' +
+    G.map(([k, n, d]) => '<div class="opt" aria-pressed="' + (group === k) + '" onclick="setGroup(\'' + k + '\')">' +
+      '<div class="dot"></div><div><b>' + n + "</b><span>" + d + "</span></div></div>").join("") +
+    '</div><div class="grp"><label>Filter query</label>' +
+    '<input type="text" class="mono" id="s_q" value="' + esc(q) + '" autocapitalize="off" spellcheck="false">' +
+    '<p style="font-size:13px;color:var(--dim)">Any Todoist filter: <span class="mono">today | overdue</span>, ' +
+    '<span class="mono">#Work &amp; p1</span>, <span class="mono">7 days</span></p>' +
+    '<div class="row"><button class="btn primary" onclick="applyQ()">Apply &amp; refresh</button></div>' +
+    '</div><div class="grp"><label>Google Calendar</label>' +
+    (localStorage.getItem(LS.gcal)
+      ? '<p style="font-size:13px;color:var(--dim)">Connected \u00b7 ' + events.length +
+        ' events loaded. Read only.</p><div class="row"><button class="btn" onclick="loadEvents()">Refresh events</button>' +
+        '<button class="btn danger" onclick="gDisconnect()">Disconnect</button></div>'
+      : '<p style="font-size:13px;color:var(--dim)">Show your Google Calendar events beside your tasks.</p>' +
+        '<div class="row"><button class="btn primary" onclick="gConnect()">Connect Google Calendar</button></div>') +
+    '</div><div class="grp"><label>Account</label>' +
+    '<div class="row"><button class="btn" onclick="load()">Refresh</button>' +
+    '<button class="btn danger" onclick="logout()">Forget token</button></div></div>';
+}
+
+/* ---------- long press menu ---------- */
+
+let pressT = null, pressed = false;
+function pressStart(e, id) {
+  pressed = false;
+  clearTimeout(pressT);
+  pressT = setTimeout(() => { pressed = true; openMenu(id); if (navigator.vibrate) navigator.vibrate(12); }, 420);
+}
+const pressEnd = () => clearTimeout(pressT);
+function bodyTap(id) { if (pressed) { pressed = false; return; } openSheet(id); }
+
+// Deadline is deliberately absent: the API returns 403 PREMIUM_ONLY on a free account.
+function openMenu(id) {
+  const t = tasks.find(x => String(x.id) === String(id));
+  if (!t) return;
+  const items = [
+    ["&#9638;", "Schedule", "menuField('e_due')", ""],
+    ["&#8677;", "Move to project", "menuField('e_proj')", ""],
+    ["&#9873;", "Priority", "menuField('e_prio')", ""],
+    ["&#10697;", "Duplicate task", "dupTask('" + t.id + "')", "sep"],
+    ["&#8599;", "Copy link", "copyLink('" + t.id + "')", ""],
+    ["&#10005;", "Delete task", "delTask('" + t.id + "')", "sep del"]
+  ];
+  $("menubox").innerHTML = items.map(([ic, n, fn, cls]) =>
+    '<button class="mi ' + cls + '" onclick="closeMenu();' + fn + '"><i>' + ic + "</i>" + n + "</button>").join("");
+  menuFor = t;
+  $("menu").classList.remove("hide");
+}
+let menuFor = null;
+const closeMenu = () => $("menu").classList.add("hide");
+function menuField(f) {
+  openSheet(menuFor.id);
+  setTimeout(() => { const el = $(f); if (el) { el.scrollIntoView({block: "center"}); if (el.focus) el.focus(); } }, 90);
+}
+
+async function dupTask(id) {
+  const t = tasks.find(x => String(x.id) === String(id));
+  if (!t) return;
+  const body = {content: t.content, priority: prio(t), project_id: t.project_id,
+                description: t.description || "", labels: t.labels || []};
+  if (t.due && t.due.string) body.due_string = t.due.string;
+  try { await api("/tasks", {method: "POST", body: JSON.stringify(body)}); toast("Duplicated"); await load(); }
+  catch (e) { err(e.message); }
+}
+
+async function copyLink(id) {
+  const url = "https://app.todoist.com/app/task/" + id;
+  try { await navigator.clipboard.writeText(url); toast("Link copied"); }
+  catch { err("Clipboard blocked. Link: " + url); }
+}
+
+/* ---------- actions ---------- */
+
+async function done(btn) {
+  const el = btn.closest(".t"), id = el.dataset.id;
+  btn.classList.add("fill");
+  setTimeout(() => el.classList.add("go"), 130);
+  try {
+    await api("/tasks/" + id + "/close", {method: "POST"});
+    tasks = tasks.filter(t => String(t.id) !== String(id));
+    cache();
+    setTimeout(() => { render(); toast("Done"); }, 260);
+  } catch (e) { btn.classList.remove("fill"); el.classList.remove("go"); err(e.message); }
+}
+
+function completeFromSheet() {
+  if (!editing) return;
+  const id = editing.id;
+  closeSheet();
+  api("/tasks/" + id + "/close", {method: "POST"})
+    .then(() => { tasks = tasks.filter(t => String(t.id) !== String(id)); cache(); render(); toast("Done"); })
+    .catch(e => err(e.message));
+}
+
+function openSheet(id) {
+  editing = id ? tasks.find(t => String(t.id) === String(id)) : null;
+  $("e_content").value = editing ? editing.content : "";
+  editDueOrig = editing && editing.due ? (editing.due.string || editing.due.date) : "";
+  $("e_due").value = editDueOrig;
+  paintDue();
+  editProjOrig = editing ? editing.project_id : "";
+  editPrio = editing ? prio(editing) : 1;
+  duePostpone = false;
+  editLabels = editing ? [...(editing.labels || [])] : [];
+  $("e_prio").innerHTML = [4, 3, 2, 1].map(p =>
+    '<button data-p="' + p + '" onclick="setPrio(' + p + ')">' + PNAME[p] + "</button>").join("");
+  paintPrio();
+  $("e_proj").innerHTML = projects.map(p =>
+    '<option value="' + p.id + '"' + (editing && editing.project_id === p.id ? " selected" : "") + ">" +
+    esc(p.name) + "</option>").join("");
+  paintHash();
+  $("e_proj").onchange = paintHash;
+  $("e_desc").value = editing ? (editing.description || "") : "";
+  $("x_desc").classList.toggle("hide", !(editing && editing.description));
+  $("c_desc").setAttribute("aria-pressed", !!(editing && editing.description));
+  $("x_lab").classList.add("hide");
+  $("c_lab").setAttribute("aria-pressed", editLabels.length > 0);
+  paintLabels();
+  if (editing) $("e_box").style.setProperty("--pc", PCOL[prio(editing)]);
+  renderSubs();
+  $("sheet").classList.toggle("creating", !editing);
+  $("sheet").classList.remove("hide");
+  if (!editing) $("e_content").focus();
+}
+const closeSheet = () => { $("sheet").classList.add("hide"); editing = null; };
+
+function paintHash() {
+  const p = projects.find(x => x.id === $("e_proj").value);
+  $("e_hash").style.color = p ? (PROJCOL[p.color] || "var(--dim)") : "var(--dim)";
+}
+function setPrio(p) { editPrio = p; paintPrio(); }
+function paintPrio() {
+  $("e_prio").querySelectorAll("button").forEach(b => {
+    const on = +b.dataset.p === editPrio;
+    b.setAttribute("aria-pressed", on);
+    b.style.background = on ? PCOL[+b.dataset.p] : "";
+    b.style.borderColor = on ? PCOL[+b.dataset.p] : "";
+    b.style.color = on ? "#fff" : "";
+  });
+}
+function toggleExtra(k) {
+  const el = $("x_" + (k === "desc" ? "desc" : "lab"));
+  el.classList.toggle("hide");
+  $(k === "desc" ? "c_desc" : "c_lab").setAttribute("aria-pressed", !el.classList.contains("hide"));
+}
+function paintLabels() {
+  $("x_lab").innerHTML = labels.map(l =>
+    '<button class="chip" aria-pressed="' + editLabels.includes(l.name) + '" onclick="toggleLabel(\'' +
+    esc(l.name).replace(/'/g, "") + '\')">' + esc(l.name) + "</button>").join("") ||
+    '<span style="color:var(--dim);font-size:13px">No labels defined in Todoist.</span>';
+}
+function toggleLabel(n) {
+  editLabels = editLabels.includes(n) ? editLabels.filter(x => x !== n) : [...editLabels, n];
+  paintLabels();
+}
+
+// ponytail: sub-tasks are read from the already-loaded list, so children outside the
+// current filter are not shown. Adding always works. Upgrade: fetch by parent_id.
+function renderSubs() {
+  if (!editing) { $("e_subs").innerHTML = ""; return; }
+  const kids = tasks.filter(t => String(t.parent_id) === String(editing.id));
+  $("e_subs").innerHTML = kids.map(k =>
+    '<div class="sub"><button class="box" style="--pc:' + PCOL[prio(k)] +
+    '" onclick="done(this)"></button>' + esc(k.content) + "</div>").join("") ||
+    '<div style="color:var(--dim);font-size:13px">None in this view.</div>';
+}
+
+async function addSub() {
+  if (!editing) return;
+  const t = editing;
+  closeSheet();
+  openSheet();
+  $("e_content").value = "";
+  $("e_content").placeholder = "Sub-task of: " + t.content;
+  pendingParent = t.id;
+}
+let pendingParent = null;
+
+async function saveTask() {
+  const content = $("e_content").value.trim();
+  if (!content) return;
+  const due = $("e_due").value.trim();
+  const body = {content, priority: editPrio};
+  const rec = editing && editing.due && editing.due.is_recurring ? editing.due.string : null;
+  const act = dueAction(rec, due, editDueOrig, duePostpone, !editing);
+  if (act.due_string) body.due_string = act.due_string;
+  const proj = $("e_proj").value;
+  try {
+    if (editing) {
+      body.description = $("e_desc").value;
+      body.labels = editLabels;
+      await api("/tasks/" + editing.id, {method: "POST", body: JSON.stringify(body)});
+      // Moving one occurrence of a recurring task: only sync accepts a due object.
+      if (act.moveOccurrence)
+        await api("/sync", {method: "POST", body: JSON.stringify({commands: JSON.stringify(
+          [{type: "item_update", uuid: uid(), args: {id: editing.id,
+            due: {date: act.moveOccurrence, string: rec, is_recurring: true}}}])})});
+      // The update endpoint ignores project_id; moving is a sync command.
+      if (proj && proj !== editProjOrig)
+        await api("/sync", {method: "POST", body: JSON.stringify({commands: JSON.stringify(
+          [{type: "item_move", uuid: uid(), args: {id: editing.id, project_id: proj}}])})});
+      toast("Saved");
+    } else if (pendingParent) {
+      await api("/tasks", {method: "POST", body: JSON.stringify({content, parent_id: pendingParent})});
+      toast("Sub-task added");
+    } else {
+      // Todoist's own natural-language parser handles date, priority and project in one line.
+      await api("/tasks/quick", {method: "POST", body: JSON.stringify({text: content})});
+      toast("Added");
+    }
+    pendingParent = null;
+    $("e_content").placeholder = "What needs doing?";
+    closeSheet(); await load();
+  } catch (e) { err(e.message); }
+}
+
+async function delTask(id) {
+  const tid = id || (editing && editing.id);
+  if (!tid) return;
+  try {
+    await api("/tasks/" + tid, {method: "DELETE"});
+    tasks = tasks.filter(t => String(t.id) !== String(tid));
+    closeSheet(); cache(); render(); toast("Deleted");
+  } catch (e) { err(e.message); }
+}
+
+/* ---------- date picker ---------- */
+
+const FMT_WD3 = new Intl.DateTimeFormat(undefined, {weekday: "short"});
+let dsMonth = null, duePostpone = false;
+
+// First matching weekday strictly after `from`, so "this weekend" is never today.
+function nextDow(from, dow) {
+  const d = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+  do { d.setDate(d.getDate() + 1); } while (d.getDay() !== dow);
+  return d;
+}
+
+// Rescheduling a recurring task must move the occurrence, not replace the rule:
+// due_date and a plain due_string both clear is_recurring. Only a sync item_update
+// carrying the original string keeps it. Resending the rule advances one cycle.
+const DOW = {sunday:0, sun:0, monday:1, mon:1, tuesday:2, tues:2, tue:2, wednesday:3, weds:3, wed:3,
+             thursday:4, thurs:4, thur:4, thu:4, friday:5, fri:5, saturday:6, sat:6};
+
+// Which days of a given month the rule lands on. Covers the rules Todoist actually
+// produces for everyday use; anything unrecognised returns an empty set so the picker
+// shows nothing rather than confidently circling the wrong days.
+function recurMatches(rule, anchor, y, m) {
+  const out = new Set();
+  if (!rule) return out;
+  const r = String(rule).toLowerCase().trim();
+  const last = new Date(y, m + 1, 0).getDate();
+  const add = d => out.add(iso(new Date(y, m, d)));
+  const anchorDate = anchor ? new Date(anchor.slice(0, 10) + "T00:00:00") : null;
+
+  if (/^every\s+(day|days)$/.test(r) || r === "daily") { for (let d = 1; d <= last; d++) add(d); return out; }
+  if (/^every\s+weekday$/.test(r))
+    { for (let d = 1; d <= last; d++) { const w = new Date(y, m, d).getDay(); if (w >= 1 && w <= 5) add(d); } return out; }
+
+  let mm = r.match(/^every\s+(\d+)\s+days?$/);
+  if (mm && anchorDate) {
+    const n = +mm[1];
+    for (let d = 1; d <= last; d++) {
+      const diff = Math.round((new Date(y, m, d) - anchorDate) / 86400000);
+      if (((diff % n) + n) % n === 0) add(d);
+    }
+    return out;
+  }
+
+  const names = (r.match(/\b(sunday|saturday|thursday|wednesday|tuesday|monday|friday|sun|mon|tues|tue|weds|wed|thurs|thur|thu|fri|sat)\b/g) || [])
+    .map(x => DOW[x]).filter(v => v !== undefined);
+  if (/^every\b/.test(r) && names.length) {
+    const set = new Set(names);
+    for (let d = 1; d <= last; d++) if (set.has(new Date(y, m, d).getDay())) add(d);
+    return out;
+  }
+
+  if (/^every\s+week$/.test(r) && anchorDate) {
+    const w = anchorDate.getDay();
+    for (let d = 1; d <= last; d++) if (new Date(y, m, d).getDay() === w) add(d);
+    return out;
+  }
+
+  mm = r.match(/^every\s+(?:(\d+)\s+)?months?$/);
+  if (mm && anchorDate) {
+    const n = mm[1] ? +mm[1] : 1;
+    const gap = (y - anchorDate.getFullYear()) * 12 + (m - anchorDate.getMonth());
+    if (((gap % n) + n) % n === 0 && anchorDate.getDate() <= last) add(anchorDate.getDate());
+    return out;
+  }
+
+  if (/^every\s+year$/.test(r) && anchorDate && anchorDate.getMonth() === m) add(anchorDate.getDate());
+  return out;
+}
+
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+function dueAction(rec, due, origDue, postpone, isNew) {
+  if (postpone && rec) return {due_string: rec};
+  const changed = isNew ? !!due : due !== origDue;
+  if (!changed) return {};
+  if (rec && ISO_DAY.test(due)) return {moveOccurrence: due};
+  return {due_string: due || "no date"};
+}
+
+const paintDue = () => { $("e_duetxt").textContent = $("e_due").value || "No date"; };
+
+function openDate() { $("d_text").value = $("e_due").value; dsMonth = null; renderDate();
+  $("dsheet").classList.remove("hide"); }
+const closeDate = () => { bulkDate = false; $("dsheet").classList.add("hide"); };
+function applyDate() {
+  const v = $("d_text").value.trim(), bulk = bulkDate;
+  closeDate();
+  if (bulk) return bulkReschedule(v);
+  duePostpone = false; $("e_due").value = v; paintDue();
+}
+
+// ponytail: reuses the edit sheet's date picker with `editing` still null, so it shows no
+// Postpone row and no recurrence circles -- correct here, the tasks have different rules.
+let bulkDate = false;
+function openBulkDate() { bulkDate = true; $("d_text").value = ""; dsMonth = null; renderDate();
+  $("dsheet").classList.remove("hide"); }
+
+async function bulkReschedule(v) {
+  const today = iso(new Date()), late = tasks.filter(t => overdue(t, today));
+  if (!v || !late.length) return;
+  const cmds = [], posts = [];
+  for (const t of late) {
+    const rec = t.due && t.due.is_recurring ? t.due.string : null;
+    const act = dueAction(rec, v, t.due && t.due.date, false, false);
+    if (act.moveOccurrence)
+      cmds.push({type: "item_update", uuid: uid(), args: {id: t.id,
+        due: {date: act.moveOccurrence, string: rec, is_recurring: true}}});
+    else if (act.due_string)
+      posts.push(api("/tasks/" + t.id, {method: "POST", body: JSON.stringify({due_string: act.due_string})}));
+  }
+  try {
+    await Promise.all(posts);
+    if (cmds.length) await api("/sync", {method: "POST",
+      body: JSON.stringify({commands: JSON.stringify(cmds)})});
+    toast("Rescheduled " + late.length);
+    await load();
+  } catch (e) { err(e.message); }
+}
+function pickDate(v) {
+  if (v === "__postpone") {
+    duePostpone = true;
+    $("e_due").value = "next occurrence";
+    paintDue(); closeDate(); return;
+  }
+  duePostpone = false;
+  $("d_text").value = v; applyDate();
+}
+function dsNav(n) { dsMonth = new Date(dsMonth.getFullYear(), dsMonth.getMonth() + n, 1); renderDate(); }
+
+function renderDate() {
+  const now = new Date(), TODAY = iso(now);
+  const tom = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  const sat = nextDow(now, 6), mon = nextDow(now, 1);
+  const rec = editing && editing.due && editing.due.is_recurring ? editing.due.string : null;
+  const quick = [
+    ["\u2600\ufe0e", "Tomorrow", FMT_WD3.format(tom), iso(tom), "#eb8909"],
+    ["\u25ad", "This Weekend", FMT_WD3.format(sat), iso(sat), "#246fe0"],
+    ["\u2192", "Next Week", FMT_WD3.format(mon), iso(mon), "#884dff"],
+    ["\u2298", "No Date", "", "no date", "var(--dim)"]
+  ];
+  // Todoist offers Today only when the task is not already sitting on today.
+  const onToday = editing && editing.due && editing.due.date && editing.due.date.slice(0, 10) === TODAY;
+  if (!onToday) quick.unshift(["\u25a3", "Today", FMT_WD3.format(now), TODAY, "#25b84c"]);
+  if (rec) quick.unshift(["\u21bb", "Postpone", "next " + rec, "__postpone", "#4073ff"]);
+  $("d_quick").innerHTML = quick.map(([ic, n, r, v, c]) =>
+    '<button class="qrow" onclick="pickDate(\'' + v + '\')"><i style="color:' + c + '">' + ic +
+    "</i><span>" + n + "</span><b>" + r + "</b></button>").join("");
+
+  if (!dsMonth) dsMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const y = dsMonth.getFullYear(), m = dsMonth.getMonth();
+  let html = '<div class="calhead" style="margin-top:14px">' +
+    '<button class="rnd" onclick="dsNav(-1)">&#8249;</button><b>' +
+    esc(dsMonth.toLocaleDateString(undefined, {month: "long", year: "numeric"})) +
+    '</b><button class="rnd" onclick="dsNav(1)">&#8250;</button></div><div class="cal">';
+  for (const w of ["S", "M", "T", "W", "T", "F", "S"]) html += '<div class="cw">' + w + "</div>";
+  const anchor = editing && editing.due && editing.due.date;
+  const recDays = rec ? recurMatches(rec, anchor, y, m) : null;
+  const st = calStart(y, m);
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(st.getFullYear(), st.getMonth(), st.getDate() + i), k = iso(d);
+    html += '<button class="cd' + (d.getMonth() !== m ? " off" : "") + (k === TODAY ? " today" : "") +
+      (recDays && recDays.has(k) ? " rec" : "") +
+      '" onclick="pickDate(\'' + k + '\')">' + d.getDate() + "</button>";
+  }
+  $("d_cal").innerHTML = html + "</div>";
+}
+
+/* ---------- drag to reorder ---------- */
+
+let drag = null;
+
+// Place the dragged row so its top edge sits at `top` in viewport coords. Measuring the
+// row every frame and subtracting the transform we last applied makes this self-correcting:
+// it survives a DOM reorder, a page scroll, or a row of a different height without drift.
+function dragPos(top) {
+  const nat = drag.row.getBoundingClientRect().top - drag.tf;
+  drag.tf = top - nat;
+  drag.row.style.transform = "translateY(" + drag.tf + "px)";
+}
+
+function dragStart(e, handle) {
+  const row = handle.closest(".t"), r = row.getBoundingClientRect();
+  drag = {row, grab: e.clientY - r.top, h: r.height, tf: 0, y: e.clientY};
+  row.classList.add("dragging");
+  handle.setPointerCapture(e.pointerId);
+  handle.onpointermove = dragMove;
+  handle.onpointerup = handle.onpointercancel = dragEnd;
+  drag.tick = setInterval(dragScroll, 16);
+  if (navigator.vibrate) navigator.vibrate(8);
+}
+
+// Hold the finger near either edge to scroll. Without this a list taller than the screen
+// can only be reordered as far as one screenful reaches.
+function dragScroll() {
+  if (!drag) return;
+  const edge = 110, over = drag.y < edge ? drag.y - edge : drag.y > innerHeight - edge ? drag.y - (innerHeight - edge) : 0;
+  if (!over) return;
+  scrollBy(0, Math.max(-22, Math.min(22, over / 4)));
+  dragMove({clientY: drag.y});
+}
+
+function dragMove(e) {
+  if (!drag) return;
+  drag.y = e.clientY;
+  const top = e.clientY - drag.grab, mid = top + drag.h / 2;
+  dragPos(top);
+  // Re-scan after each swap so one fast flick can travel several rows, not one per event.
+  for (let guard = 0; guard < 40; guard++) {
+    let moved = false;
+    for (const r of $("list").querySelectorAll(".t")) {
+      // saved order only breaks ties, so a row may only move inside its own day and tier
+      if (r === drag.row || r.dataset.k !== drag.row.dataset.k) continue;
+      const b = r.getBoundingClientRect(), rm = b.top + b.height / 2;
+      const after = drag.row.compareDocumentPosition(r) & Node.DOCUMENT_POSITION_FOLLOWING;
+      // 2px of hysteresis: rows of unequal height would otherwise flip back and forth.
+      if (after ? mid > rm + 2 : mid < rm - 2) { after ? r.after(drag.row) : r.before(drag.row); moved = true; break; }
+    }
+    if (!moved) break;
+    dragPos(top);
+  }
+}
+
+function dragEnd(e) {
+  if (!drag) return;
+  const {row, tick} = drag; drag = null;
+  clearInterval(tick);
+  row.classList.remove("dragging"); row.style.transform = "";
+  e.target.onpointermove = e.target.onpointerup = e.target.onpointercancel = null;
+  saveOrder([...$("list").querySelectorAll(".t")].map(r => r.dataset.id));
+  render(); toast("Order saved on this device");
+}
+
+/* ---------- gestures ---------- */
+
+for (const ev of ["gesturestart", "gesturechange", "gestureend"])
+  addEventListener(ev, e => e.preventDefault(), {passive: false});
+
+// belt and braces: a fast second tap is a zoom request on iOS
+let lastTap = 0;
+addEventListener("touchend", e => {
+  const now = Date.now();
+  if (now - lastTap < 300) e.preventDefault();
+  lastTap = now;
+}, {passive: false});
+
+/* ---------- pull to refresh ---------- */
+
+let pull = null;
+addEventListener("touchstart", e => {
+  if (window.scrollY <= 0 && !drag && tab === "tasks") pull = {y: e.touches[0].clientY, armed: false};
+}, {passive: true});
+addEventListener("touchmove", e => {
+  if (!pull || drag) return;
+  const dy = e.touches[0].clientY - pull.y;
+  if (dy <= 0 || window.scrollY > 0) { $("pull").style.height = "0px"; pull.armed = false; return; }
+  pull.armed = dy > 70;
+  $("pull").style.transition = "none";
+  $("pull").style.height = Math.min(dy * 0.5, 60) + "px";
+  $("pull").textContent = pull.armed ? "Release to refresh" : "Pull to refresh";
+}, {passive: true});
+addEventListener("touchend", () => {
+  if (!pull) return;
+  const go = pull.armed; pull = null;
+  const el = $("pull");
+  el.style.transition = "height .2s";
+  if (go) { el.textContent = "Refreshing…"; el.style.height = "34px"; load().finally(() => el.style.height = "0px"); }
+  else el.style.height = "0px";
+});
+
+/* ---------- views, boot ---------- */
+
+const cache = () => localStorage.setItem(LS.cache, JSON.stringify(tasks));
+
+function renderBrowse() {
+  const cur = localStorage.getItem(LS.q) || DEFAULT_Q;
+  $("title").textContent = "Browse";
+  $("sub").textContent = "";
+  $("out").classList.remove("tunnel");
+  viewRows = [];
+  let html = "";
+  for (const [cat, rows] of browseCats()) {
+    if (!rows.length) continue;
+    html += '<div class="grp"><label>' + esc(cat) + "</label>";
+    for (const [n, q, col, mk] of rows) {
+      const i = viewRows.push([n, q]) - 1;
+      html += '<button class="vbtn" aria-pressed="' + (q === cur) + '" onclick="setView(' + i + ')">' +
+        (mk ? '<b style="color:' + col + '">' + mk + "</b> " : "") +
+        esc(n) + ' <small>' + esc(q) + "</small></button>";
+    }
+    html += "</div>";
+  }
+  $("out").innerHTML = html;
+}
+const openViews = () => setTab("browse");
+function setView(i) { localStorage.setItem(LS.q, viewRows[i][1]); setTab("tasks"); load(); }
+function navView(q) { localStorage.setItem(LS.q, q); setTab("tasks"); load(); }
+function setGroup(g) { group = g; localStorage.setItem(LS.group, g); render(); toast("Grouping: " + g); }
+function setMode(m) { mode = m; localStorage.setItem(LS.mode, m); render(); pushMode(m); }
+
+// The widget lives in a separate sandbox and cannot see localStorage, so the mode
+// rides on a Todoist task both sides can read. Due 2099 keeps it out of every real view.
+const MODE_TASK = "todo-mode";
+
+// A client that has never had a mode chosen on it must not publish its default and
+// clobber a real choice made elsewhere. Chosen here -> push. Never chosen -> adopt.
+async function syncMode() {
+  if (localStorage.getItem(LS.mode)) { pushMode(mode); return; }
+  try {
+    const d = await api("/tasks/filter?limit=5&query=" + encodeURIComponent("search: " + MODE_TASK));
+    const hit = (d.results || [])[0];
+    const raw = hit && (hit.description || "").trim();
+    if (["all", "laser", "tunnel"].includes(raw)) {
+      mode = raw;
+      localStorage.setItem(LS.mode, raw);
+      render();
+    }
+  } catch (e) { toast("Mode sync failed"); }
+}
+async function pushMode(m) {
+  try {
+    let id = localStorage.getItem(LS.modetask);
+    if (!id) {
+      const d = await api("/tasks/filter?limit=5&query=" + encodeURIComponent("search: " + MODE_TASK));
+      const hit = (d.results || [])[0];
+      if (hit) id = hit.id;
+    }
+    if (id) await api("/tasks/" + id, {method: "POST", body: JSON.stringify({description: m})});
+    else {
+      const t = await api("/tasks", {method: "POST", body: JSON.stringify(
+        {content: MODE_TASK, description: m, due_string: "2099-01-01"})});
+      id = t.id;
+    }
+    localStorage.setItem(LS.modetask, id);
+  } catch (e) { toast("Widget mode sync failed"); }
+}
+
+// Focus is a commitment device: going deeper is one tap, backing out is a 30s hold.
+const LOCK_LABEL = "Press and hold 30s to unlock";
+// Without that asymmetry it is too easy to bail to the easy tasks mid-session.
+const RANK = {all: 0, laser: 1, tunnel: 2};
+const needsHold = (from, to) => RANK[to] < RANK[from];
+const HOLD_MS = 30000;
+
+let holdRAF = null, holdDone = false;
+function modePress(e, k) {
+  if (!needsHold(mode, k)) { setMode(k); return; }
+  const el = e.currentTarget, start = Date.now();
+  holdDone = false;
+  el.classList.add("holding");
+  const msg = el.querySelector(".lockmsg");
+  (function tick() {
+    const p = Math.min(1, (Date.now() - start) / HOLD_MS);
+    el.style.setProperty("--hold", p * 100 + "%");
+    if (msg) msg.textContent = "Keep holding \u2014 " + Math.ceil((1 - p) * HOLD_MS / 1000) + "s";
+    if (p >= 1) { holdDone = true; modeRelease(el); setMode(k); toast("Focus released"); return; }
+    holdRAF = requestAnimationFrame(tick);
+  })();
+}
+function modeRelease(el) {
+  if (holdRAF) cancelAnimationFrame(holdRAF);
+  holdRAF = null;
+  if (el) {
+    el.classList.remove("holding");
+    el.style.setProperty("--hold", "0%");
+    const msg = el.querySelector(".lockmsg");
+    if (msg) msg.textContent = LOCK_LABEL;
+  }
+}
+function modeCancel(el) {
+  const wasRunning = holdRAF !== null;
+  modeRelease(el);
+  if (wasRunning && !holdDone) toast("Hold the full 30 seconds to leave focus");
+}
+function setTab(t) {
+  tab = t;
+  render(); window.scrollTo(0, 0);
+  if (t === "calendar") { if (!calTasks.length) loadCal(); gMaybeRefresh(); }
+}
+function applyQ() { localStorage.setItem(LS.q, $("s_q").value.trim() || DEFAULT_Q); setTab("tasks"); load(); }
+function saveTok() { const v = $("tok").value.trim(); if (v) { localStorage.setItem(LS.tok, v); boot(); } }
+function logout() { localStorage.removeItem(LS.tok); location.reload(); }
+
+async function load() {
+  err("");
+  _dh.clear();
+  const q = localStorage.getItem(LS.q) || DEFAULT_Q;
+  try {
+    const d = await api("/tasks/filter?limit=200&query=" + encodeURIComponent(q));
+    tasks = d.results || d.items || (Array.isArray(d) ? d : []);
+    cache(); render();
+  } catch (e) { err(e.message); }
+}
+
+async function loadMeta() {
+  try {
+    const d = await api("/projects?limit=200");
+    setProjects(d.results || (Array.isArray(d) ? d : []));
+    localStorage.setItem(LS.proj, JSON.stringify(projects));
+    const l = await api("/labels?limit=200");
+    labels = l.results || (Array.isArray(l) ? l : []);
+    localStorage.setItem(LS.lab, JSON.stringify(labels));
+    render();
+  } catch (e) { err(e.message); }
+}
+
+function boot() {
+  const has = !!localStorage.getItem(LS.tok);
+  $("setup").classList.toggle("hide", has);
+  $("app").classList.toggle("hide", !has);
+  if (!has) return;
+  try { tasks = JSON.parse(localStorage.getItem(LS.cache) || "[]"); } catch { tasks = []; }
+  try { setProjects(JSON.parse(localStorage.getItem(LS.proj) || "[]")); } catch { setProjects([]); }
+  try { labels = JSON.parse(localStorage.getItem(LS.lab) || "[]"); } catch { labels = []; }
+  try { events = JSON.parse(localStorage.getItem(LS.ev) || "[]"); } catch { events = []; }
+  render(); load(); loadMeta();
+  syncMode();
+}
+
+if (location.search.includes("selftest")) selftest(); else boot();
+
+function selftest() {
+  const out = [];
+  const ok = (c, m) => { if (!c) throw new Error("FAIL: " + m); out.push("ok - " + m); console.log("ok -", m); };
+  const T = [{id:1,priority:1},{id:2,priority:4},{id:3,priority:3},{id:4,priority:4}];
+
+  ok(view(T,"all",[]).map(t=>t.id).join()==="2,4,3,1", "all sorts by priority tier, P1 first");
+  ok(view([{id:1,priority:4},{id:2,priority:4},{id:3,priority:4}],"all",[]).map(t=>t.id).join()==="1,2,3",
+     "manual order survives inside a tier (sort is stable)");
+  ok(view(T,"tunnel",[]).map(t=>t.id).join()==="2", "tunnel = first task of the highest tier");
+  ok(view(T,"laser",[]).map(t=>t.id).join()==="2,4", "laser = top tier only");
+  ok(view([{id:5,priority:2},{id:6,priority:2}],"laser",[]).length===2, "laser tier is relative, not hardcoded to P1");
+  ok(view([],"laser",[]).length===0 && view([],"tunnel",[]).length===0, "empty list is safe");
+  ok(view([{id:9}],"laser",[]).length===1, "missing priority defaults to P4 without crashing");
+
+  const O = [{id:"a",priority:2},{id:"b",priority:2},{id:"c",priority:4}];
+  ok(view(O,"all",[]).map(t=>t.id).join()==="c,a,b", "no saved order: priority tiers, Todoist order within");
+  ok(view(O,"all",["b","a"]).map(t=>t.id).join()==="c,b,a", "saved order reorders inside a tier");
+  ok(view(O,"all",["a","b","c"]).map(t=>t.id).join()==="c,a,b", "saved order never overrides the priority tier");
+  ok(view(O,"all",["b"]).map(t=>t.id).join()==="c,b,a", "a partially saved order still ranks known ids first");
+
+  const D = [{id:"a",priority:1,due:{date:"2026-09-02"}},{id:"b",priority:4,due:{date:"2026-08-28"}},{id:"c",priority:2}];
+  ok(view(D,"all",[],"date").map(t=>t.id).join()==="b,a,c", "date grouping sorts by due date, undated last");
+  ok(view(D,"all",[],"priority").map(t=>t.id).join()==="b,c,a", "priority grouping ignores dates");
+  // pinned: without a `today` this read the real clock and started failing once the
+  // fixture's dates went overdue, which is the branch the LATE cases below cover.
+  ok(view(D,"laser",[],"date","2026-08-27").map(t=>t.id).join()==="b", "laser reads max priority even under a date sort");
+
+  const LATE = [{id:"late",priority:1,due:{date:"2026-08-20"}},
+             {id:"hi",priority:4,due:{date:"2026-08-28"}},
+             {id:"lo",priority:2,due:{date:"2026-08-28"}}];
+  ok(view(LATE,"laser",[],"date","2026-08-28").map(t=>t.id).join()==="late,hi",
+     "laser keeps an overdue P4 that its own tier would have hidden");
+  ok(view(LATE,"laser",[],"date","2026-08-20").map(t=>t.id).join()==="hi",
+     "rescheduled forward, that same task drops back behind the laser");
+  ok(view([{id:"x",priority:1,due:{date:"2026-08-20"}}],"laser",[],"date","2026-08-28")
+       .map(t=>t.id).join()==="x", "an all-overdue list still renders instead of going empty");
+  ok(view(LATE,"tunnel",[],"date","2026-08-28").length===1, "tunnel stays one task, overdue or not");
+  ok(overdue({due:{date:"2026-08-28T09:00:00"}},"2026-08-28")===false,
+     "a task due later today is not overdue");
+
+  ok(dayHeader(null)==="No date", "undated rows get a No date header");
+  const soon = new Date(Date.now() + 5*86400000);
+  ok(dayHeader(iso(soon)).split(" · ").length===2, "a future day header reads 'Mon D · Weekday'");
+  ok(dayHeader("2000-01-01")==="Overdue", "every past date collapses into one Overdue section");
+  ok(iso(new Date(2026,0,5))==="2026-01-05", "iso() uses local parts, not UTC");
+  ok(iso(new Date(2026,0,5,23,30))==="2026-01-05", "a late evening still reports the same local day");
+
+  group = "auto";
+  ok(effGroup(D)==="date", "auto groups by day when the list spans several days");
+  ok(effGroup([{id:1,due:{date:"2026-09-02"}},{id:2,due:{date:"2026-09-02"}}])==="priority",
+     "auto groups by priority when everything lands on one day");
+  ok(effGroup([{id:1},{id:2}])==="priority", "auto falls back to priority with no dates at all");
+  group = "priority";
+  ok(effGroup(D)==="priority", "an explicit setting overrides auto");
+  group = "auto";
+
+  ok(needsHold("tunnel","all") && needsHold("tunnel","laser") && needsHold("laser","all"),
+     "loosening focus always requires the hold");
+  ok(!needsHold("all","laser") && !needsHold("all","tunnel") && !needsHold("laser","tunnel"),
+     "tightening focus is instant");
+  ok(!needsHold("laser","laser"), "reselecting the current mode is not a downgrade");
+
+  ok(evDay({start:"2026-08-27"})==="2026-08-27", "an all-day event maps to its date");
+  const EV = [{start:"2026-08-27T09:00:00",end:"2026-08-27T10:00:00"},
+              {start:"2026-08-27T09:30:00",end:"2026-08-27T10:30:00"},
+              {start:"2026-08-27T12:00:00",end:"2026-08-27T13:00:00"}];
+  const L = layoutDay(EV);
+  ok(L[0].lane===0 && L[1].lane===1, "overlapping events take separate lanes");
+  ok(L[0].lanes===2 && L[1].lanes===2, "an overlapping pair splits the width");
+  ok(L[2].lane===0 && L[2].lanes===1, "a later, separate event keeps the full width");
+  ok(layoutDay([{start:"2026-08-27T09:00:00"}])[0].en===600, "an event with no end is treated as an hour");
+  ok(dayRange([])[0]===480 && dayRange([])[1]===1200, "an empty day falls back to 8am-8pm");
+  ok(dayRange(layoutDay(EV))[0]===480, "the window snaps to the hour before the first event");
+  ok(evDay({start:"2026-08-27T11:00:00-07:00"})==="2026-08-27", "a timed event maps to its own local date");
+
+  /* --- auto time-blocking --- */
+  const EVD = [{s:600,en:660},{s:780,en:840}];            // 10-11 and 13-14
+  const G = freeGaps(EVD,[540,1080]);                      // 9:00-18:00
+  ok(G.map(g=>g.s+"-"+g.en).join()==="540-600,660-780,840-1080", "gaps are the day minus its events");
+  ok(freeGaps([{s:0,en:1440}],[540,1080]).length===0, "an all-day meeting leaves no gaps");
+  ok(freeGaps([{s:540,en:550}],[540,1080])[0].s===550, "a gap starts when the event ends");
+  ok(freeGaps([{s:545,en:1080}],[540,1080]).length===0, "a sub-15m sliver is not a block");
+  ok(freeGaps([{s:600,en:660},{s:620,en:700}],[540,1080]).map(g=>g.s).join()==="540,700",
+     "overlapping events merge into one busy stretch");
+  ok(freeGaps([{s:600,en:660}],[540,1080],15).map(g=>g.s+"-"+g.en).join()==="540-585,675-1080",
+     "a pad is taken off both sides of a commitment");
+  ok(freeGaps([{s:600,en:660},{s:690,en:750}],[540,1080],15).map(g=>g.s).join()==="540,765",
+     "two events a half hour apart leave no usable gap once padded");
+  ok(freeGaps([{s:600,en:660}],[540,1080],0).length===2, "pad defaults off, so the pure gap math stays testable");
+
+  const TT = [{id:"a"},{id:"b"},{id:"c"}];                 // 30m each by default
+  const P = planDay(TT,G);
+  ok(taskMins({})===30 && taskMins({duration:{amount:45,unit:"minute"}})===45, "duration comes off the task");
+  ok(taskMins({duration:{amount:1,unit:"day"}})===30, "a day-long task is not packed as a block");
+  ok(P[0].tasks.map(x=>x.id).join()==="a,b", "the first gap takes what fits");
+  ok(P[0].tasks[1].s===570, "packing is back to back inside a gap");
+  ok(P[1].tasks[0].s===660, "the overflow starts at the next gap, not mid-meeting");
+  ok(planDay([{id:"x",duration:{amount:200,unit:"minute"}}],G)[0].tasks[0].id==="x",
+     "a task too big for gap one moves whole to a gap that holds it");
+  ok(planDay(TT,[]).length===0, "no gaps means no plan, not a crash");
+
+  const PL = [{s:540,en:600,tasks:[{id:"1",s:540,en:570},{id:"2",s:570,en:600}]},
+              {s:660,en:780,tasks:[{id:"3",s:660,en:690}]}];
+  const TL = [{id:"1",priority:1},{id:"2",priority:1},{id:"3",priority:4}];
+  ok(view(TL,"tunnel",[],"priority","2026-09-10",PL,670).map(t=>t.id).join()==="3",
+     "tunnel is exactly the block you are in");
+  ok(view(TL,"laser",[],"priority","2026-09-10",PL,670).map(t=>t.id).join()==="3,1,2",
+     "laser adds what you did not finish in earlier blocks");
+  ok(view(TL,"laser",[],"priority","2026-09-10",PL,560).map(t=>t.id).join()==="1,2",
+     "in the first block there is no backlog to carry");
+  ok(view(TL,"tunnel",[],"priority","2026-09-10",PL,620).length===0,
+     "between blocks tunnel shows nothing");
+  ok(view(TL,"laser",[],"priority","2026-09-10",PL,620).map(t=>t.id).join()==="1,2",
+     "but laser still carries the unfinished ones");
+  ok(view(TL,"all",[],"priority","2026-09-10",PL,670).length===3, "all ignores the plan");
+  ok(view(TL,"laser",[],"priority","2026-09-10",[],670).map(t=>t.id).join()==="3",
+     "with no plan, laser falls back to the priority tier (id 3 is the only P1)");
+  ok(blockAt(PL,670).s===660 && blockAt(PL,620)===null, "blockAt is half-open on the end");
+
+  ok(dueAction("every monday","2026-09-03","2026-08-31",false,false).moveOccurrence==="2026-09-03",
+     "a picked date on a recurring task moves the occurrence, keeping the rule");
+  ok(dueAction("every monday","2026-09-03","2026-08-31",false,false).due_string===undefined,
+     "and it never sends due_string, which would clear is_recurring");
+  ok(dueAction("every monday","next occurrence","2026-08-31",true,false).due_string==="every monday",
+     "postpone resends the rule, advancing one cycle");
+  ok(dueAction("every monday","every friday","2026-08-31",false,false).due_string==="every friday",
+     "typing a new rule replaces the old rule");
+  ok(dueAction(null,"2026-09-03","2026-08-31",false,false).due_string==="2026-09-03",
+     "a non-recurring task just takes the date");
+  ok(Object.keys(dueAction("every monday","2026-08-31","2026-08-31",false,false)).length===0,
+     "an untouched due sends nothing, so recurrence is never disturbed");
+  ok(dueAction(null,"tomorrow","",false,true).due_string==="tomorrow", "a new task sends what was typed");
+
+  const EVS = [{title:"gym", s:600, en:660}, {title:"lunch", s:780, en:825}];
+  ok(nowState(EVS, 630).live && nowState(EVS, 630).e.title==="gym", "an event in progress is the live one");
+  ok(Math.round(nowState(EVS, 630).pct)===50, "progress is elapsed over duration");
+  ok(nowState(EVS, 630).left===30, "time left counts down to the end");
+  ok(nowState(EVS, 600).pct===0 && nowState(EVS, 659).pct > 98,
+     "progress runs from 0 at the start to nearly 100 at the end");
+  ok(!nowState(EVS, 700).live && nowState(EVS, 700).e.title==="lunch",
+     "between events it shows the next one");
+  ok(nowState(EVS, 700).left===80, "and counts down to when it starts");
+  ok(nowState(EVS, 900)===null, "after the last event there is nothing to show");
+  ok(nowState([], 600)===null, "an empty day shows no card");
+  ok(nowState([{title:"x", s:600, en:600}], 600).pct===100, "a zero-length event does not divide by zero");
+  ok(durLabel(45)==="45m" && durLabel(90)==="1h 30m", "durations read naturally past an hour");
+
+  const sept = (rule, anchor) => [...recurMatches(rule, anchor, 2026, 8)].sort();
+  ok(sept("every sat","2026-08-29").join()==="2026-09-05,2026-09-12,2026-09-19,2026-09-26",
+     "every sat circles each Saturday of the month");
+  ok(sept("Every Sat","2026-08-29").length===4, "rule matching is case-insensitive");
+  ok(sept("every day","2026-08-29").length===30, "every day circles the whole month");
+  ok(sept("every weekday","2026-08-29").length===22, "every weekday skips weekends");
+  ok(sept("every 3 days","2026-09-01").slice(0,3).join()==="2026-09-01,2026-09-04,2026-09-07",
+     "every N days steps from the anchor");
+  ok(sept("every month","2026-08-14").join()==="2026-09-14", "every month keeps the day of month");
+  ok(sept("every 4th of never","2026-08-29").length===0,
+     "an unrecognised rule circles nothing rather than guessing");
+  ok(sept(null,"2026-08-29").length===0, "a non-recurring task circles nothing");
+
+  const THU = new Date(2026,7,27);
+  ok(iso(nextDow(THU,6))==="2026-08-29", "this weekend from a Thursday is that Saturday");
+  ok(iso(nextDow(THU,1))==="2026-08-31", "next week from a Thursday is the coming Monday");
+  ok(iso(nextDow(new Date(2026,7,29),6))==="2026-09-05", "on a Saturday, this weekend means the next one");
+
+  ok(calStart(2026,7).getDay()===0, "calendar grid always starts on a Sunday");
+  ok(iso(calStart(2026,7))==="2026-07-26", "August 2026 grid starts Jul 26");
+  ok(iso(calStart(2026,1))==="2026-02-01", "a month starting on Sunday needs no back-fill");
+
+  ok(PROJCOL.berry_red==="#b8256f" && PROJCOL.grape==="#884dff", "Todoist palette maps project colours");
+  ok(PCOL[4]==="#d1453b", "P1 uses Todoist red");
+
+  document.body.innerHTML = "<pre style='padding:20px;color:#4ade80;font:13px ui-monospace'>" +
+    out.join("\n") + "\n\n" + out.length + " passed</pre>";
+}
+</script>

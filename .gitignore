@@ -1,0 +1,15 @@
+# Credentials — .gcal_token.json holds a live Google OAuth refresh_token
+# and client_secret. Never commit it.
+.gcal_token.json
+*token*.json
+client_secret*.json
+
+# Personal schedule data
+*.ics
+
+# Deploy + build state
+.netlify
+.wrangler
+__pycache__/
+*.pyc
+.DS_Store
