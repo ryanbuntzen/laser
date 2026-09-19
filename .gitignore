@@ -13,3 +13,6 @@ client_secret*.json
 __pycache__/
 *.pyc
 .DS_Store
+
+# Google client id, injected at deploy time by deploy.sh
+.gcalid

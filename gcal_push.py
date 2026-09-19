@@ -184,19 +184,19 @@ if __name__ == "__main__":
     owner = "?"
     for e in evs:
         try:
-            r = svc.events().insert(calendarId="primary", body=e).execute()
+            r = svc.events().insert(calendarId="primary", body=e).execute(num_retries=5)
             owner = (r.get("organizer") or {}).get("email", owner)
             made += 1; print(f"  created  {e['summary']}")
         except HttpError as err:
             if err.resp.status != 409:
                 raise
-            r = svc.events().update(calendarId="primary", eventId=e["id"], body=e).execute()
+            r = svc.events().update(calendarId="primary", eventId=e["id"], body=e).execute(num_retries=5)
             owner = (r.get("organizer") or {}).get("email", owner)
             upd += 1; print(f"  updated  {e['summary']}")
     gone = 0
     for key in STALE:
         try:
-            svc.events().delete(calendarId="primary", eventId=eid(key)).execute()
+            svc.events().delete(calendarId="primary", eventId=eid(key)).execute(num_retries=5)
             gone += 1; print(f"  deleted  {key}")
         except HttpError as err:
             if err.resp.status not in (404, 410):

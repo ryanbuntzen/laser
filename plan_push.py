@@ -48,7 +48,7 @@ def busy(svc, day):
     lo = dt.datetime.combine(day, dt.time.min).isoformat() + "-07:00"
     hi = dt.datetime.combine(day, dt.time.max).isoformat() + "-07:00"
     r = svc.events().list(calendarId="primary", timeMin=lo, timeMax=hi,
-                          singleEvents=True, orderBy="startTime").execute()
+                          singleEvents=True, orderBy="startTime").execute(num_retries=5)
     out = []
     for e in r.get("items", []):
         if (e.get("extendedProperties", {}).get("private", {}).get("laserplan")):
@@ -142,23 +142,36 @@ def pack(items, gaps):
     return sorted(out, key=lambda x: (x["s"] is None, x["s"] or 0))
 
 
-def plan(tasks, evs):
-    """Day tasks into the working window, "Evening"-labelled ones into the night."""
+def plan(tasks, evs, now=None):
+    """Day tasks into the working window, "Evening"-labelled ones into the night.
+
+    `now` shrinks the day window so the 13:00 replan books the afternoon it still
+    has, rather than rewriting a morning that has already happened.
+    """
+    win = list(WINDOW)
+    if now is not None:
+        win[0] = max(win[0], now)
     tasks.sort(key=lambda t: (-t["priority"], t["mins"]))   # Todoist p1 == priority 4
     night = [t for t in tasks if "Evening" in t["labels"]]
     day = [t for t in tasks if t not in night]
 
     chores = [t for t in day if t["mins"] <= CHORE]
-    items = [{"name": t["content"], "mins": t["mins"], "id": t["id"]}
+    items = [{"name": t["content"], "mins": t["mins"], "id": t["id"], "ids": [t["id"]]}
              for t in day if t["mins"] > CHORE]
     if chores:
         # One early sweep, not fifteen scattered blocks -- and doing them first
         # keeps a 15-minute errand from being the thing that finds no room at 5pm.
         items.insert(0, {"name": "Chores: " + ", ".join(t["content"] for t in chores),
-                         "mins": sum(t["mins"] for t in chores), "id": "chores"})
+                         "mins": sum(t["mins"] for t in chores), "id": "chores",
+                         "ids": [t["id"] for t in chores]})
 
-    out = pack(items, free_gaps(evs, list(WINDOW)))
-    out += pack([{"name": t["content"], "mins": t["mins"], "id": t["id"]} for t in night],
+    # free_gaps widens the window around early events, which would undo the `now`
+    # clamp -- so clip what it returns back to the start of the day we still have.
+    day_gaps = [{"s": max(g["s"], win[0]), "en": g["en"]}
+                for g in free_gaps(evs, win) if g["en"] - max(g["s"], win[0]) >= MIN_GAP]
+    out = pack(items, day_gaps)
+    out += pack([{"name": t["content"], "mins": t["mins"], "id": t["id"], "ids": [t["id"]]}
+                 for t in night],
                 free_gaps(evs, list(EVENING), widen=False))
     return out
 
@@ -167,9 +180,9 @@ def plan(tasks, evs):
 
 def write(svc, blocks, day):
     old = svc.events().list(calendarId="primary", privateExtendedProperty=f"laserplan={day}",
-                            singleEvents=True).execute().get("items", [])
+                            singleEvents=True).execute(num_retries=5).get("items", [])
     for e in old:
-        svc.events().delete(calendarId="primary", eventId=e["id"]).execute()
+        svc.events().delete(calendarId="primary", eventId=e["id"]).execute(num_retries=5)
     n = 0
     for b in blocks:
         if b["s"] is None:
@@ -182,8 +195,11 @@ def write(svc, blocks, day):
             "colorId": "8",                        # Graphite -- planned work, not a commitment
             "description": "Planned by plan_push.py from Todoist. Edits here are overwritten "
                            "on the next run; change the task in Todoist instead.",
-            "extendedProperties": {"private": {"laserplan": str(day), "task": b["id"]}},
-        }).execute()
+            # Laser reads these back so its blue slot times are this exact plan,
+            # rather than a second one it computes in the browser.
+            "extendedProperties": {"private": {"laserplan": str(day), "task": b["id"],
+                                               "tasks": ",".join(b["ids"])[:1000]}},
+        }).execute(num_retries=5)
         n += 1
     return len(old), n
 
@@ -201,6 +217,13 @@ def selftest():
     assert [(x["mins"], x["s"]) for x in p] == [(30, 540), (90, 700)], p  # 90 skips gap 1 whole,
     assert pack([{"mins": 90}], [{"s": 540, "en": 600}])[0]["s"] is None  # and 30 still uses it
     assert pack([{"mins": 30}], [])[0]["s"] is None
+    # a replan at 15:00 must not book the morning it already missed
+    one = [{"content": "x", "mins": 30, "priority": 1, "labels": [], "id": "1"}]
+    assert plan(one, [], now=900)[0]["ids"] == ["1"]          # every block names its tasks
+    assert plan(one, [], now=900)[0]["s"] == 900
+    # an early event must not drag the clamped window back before `now`
+    assert plan(one, [{"s": 450, "en": 557, "what": "gym"}], now=900)[0]["s"] == 900
+    assert plan(one, [], now=23 * 60)[0]["s"] is None   # nothing left today is not a crash
     assert stated({"labels": ["90m"], "content": "x"}) == 90
     assert stated({"labels": [], "content": "write essay [2h]"}) == 120
     assert stated({"labels": ["home"], "content": "x"}) is None
@@ -221,7 +244,8 @@ if __name__ == "__main__":
     raw = todoist()
     skipped = [t for t in raw if COVERED.match(t["content"])]
     tasks = estimate([t for t in raw if t not in skipped], "--no-llm" not in sys.argv)
-    blocks = plan(tasks, evs)
+    t = dt.datetime.now()
+    blocks = plan(tasks, evs, now=t.hour * 60 + t.minute)
 
     for e in sorted(evs, key=lambda e: e["s"]):
         print(f"  {hhmm(e['s'])}-{hhmm(e['en'])}  [busy] {e['what']}")

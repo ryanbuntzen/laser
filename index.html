@@ -487,9 +487,22 @@ const mm2t = m => FMT_T.format(new Date(2000, 0, 1, Math.floor(m / 60), m % 60))
 const slotMap = plan => Object.fromEntries(plan.flatMap(b => b.tasks.map(x => [x.id, x])));
 const blockAt = (plan, mins) => plan.find(b => b.s <= mins && mins < b.en) || null;
 
+// The blocks plan_push.py wrote, in the shape planDay returns.
+function calPlan(written) {
+  return written.map(e => {
+    const s = evMins(e.start), en = e.end ? evMins(e.end) : s + 30;
+    return {s: s, en: en, tasks: (e.slotIds || "").split(",").filter(Boolean)
+      .map(id => ({id: String(id), s: s, en: en}))};
+  }).filter(b => b.tasks.length).sort((a, b) => a.s - b.s);
+}
+
 // Today's plan, built from the unfiltered list so it does not change with the mode.
 function todayPlan(list = tasks, today = iso(new Date())) {
-  const evs = eventsOn(today).filter(e => !e.allDay)
+  // plan_push.py already planned today onto the calendar. Read that back rather
+  // than computing a second plan here -- one source of truth, no drift.
+  const written = eventsOn(today).filter(e => e.plan === today);
+  if (written.length) return calPlan(written);
+  const evs = eventsOn(today).filter(e => !e.allDay && e.plan !== today)
     .map(e => ({s: evMins(e.start), en: e.end ? evMins(e.end) : evMins(e.start) + 60}));
   const [lo, hi] = dayWindow();
   const win = evs.length ? [Math.min(lo, ...evs.map(e => e.s)), Math.max(hi, ...evs.map(e => e.en))] : [lo, hi];
@@ -621,7 +634,9 @@ function taskRow(t, drag, hideDue, today, dayk, slot) {
 // Your own Google OAuth *browser* client id, kept out of the repo. Set it once:
 //   localStorage.setItem("laser.gcalid", "<id>.apps.googleusercontent.com")
 // then reload. See README for how to make one.
-const GCAL_ID = localStorage.getItem(LS.gcalid) || "";
+const GCAL_ID_BUILD = "__GCAL_ID__";   // deploy.sh substitutes the real id
+const GCAL_ID = localStorage.getItem(LS.gcalid) ||
+                (GCAL_ID_BUILD.startsWith("__") ? "" : GCAL_ID_BUILD);
 // calendar.events grants read AND write on events (not calendar management).
 // A client left in Testing needs no Data Access registration -- any listed
 // test user can consent to this scope directly.
@@ -690,7 +705,10 @@ async function loadEvents() {
       title: e.summary || "(no title)",
       start: e.start.dateTime || e.start.date,
       end: e.end && (e.end.dateTime || e.end.date) || null,
-      allDay: !e.start.dateTime
+      allDay: !e.start.dateTime,
+      // plan_push.py stamps these on the blocks it writes; see todayPlan.
+      plan: (e.extendedProperties && e.extendedProperties.private || {}).laserplan || null,
+      slotIds: (e.extendedProperties && e.extendedProperties.private || {}).tasks || ""
     }));
     localStorage.setItem(LS.ev, JSON.stringify(events));
     gLastLoad = Date.now();
@@ -1639,6 +1657,14 @@ function selftest() {
   ok(planDay([{id:"x",duration:{amount:200,unit:"minute"}}],G)[0].tasks[0].id==="x",
      "a task too big for gap one moves whole to a gap that holds it");
   ok(planDay(TT,[]).length===0, "no gaps means no plan, not a crash");
+
+  // calPlan: the blocks plan_push.py wrote are the plan, drift-free
+  const CP = calPlan([{start:"2026-01-02T14:53:00", end:"2026-01-02T17:08:00", slotIds:"a,b"},
+                      {start:"2026-01-02T09:00:00", end:"2026-01-02T09:30:00", slotIds:""}]);
+  ok(CP.length===1, "a block naming no tasks is not a plan block");
+  ok(CP[0].tasks.length===2 && CP[0].tasks[0].s===893,
+     "every task in a chore block shares the block's start time");
+  ok(slotMap(CP).b.s===893, "the blue slot time comes straight off the calendar");
 
   const PL = [{s:540,en:600,tasks:[{id:"1",s:540,en:570},{id:"2",s:570,en:600}]},
               {s:660,en:780,tasks:[{id:"3",s:660,en:690}]}];
