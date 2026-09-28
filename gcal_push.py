@@ -12,7 +12,7 @@ there is no delete-and-recreate and nothing to orphan.
     python3 gcal_push.py            # show what would be written
     python3 gcal_push.py --push     # write it
 """
-import sys, hashlib, datetime as dt
+import sys, json, hashlib, datetime as dt
 from pathlib import Path
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
@@ -25,6 +25,8 @@ SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
 SECRET = Path.home() / "Claude/emailManager/credentials/client_secret.json"
 TOKEN = Path.home() / "laser/.gcal_token.json"
 TZ = "America/Los_Angeles"
+# Recruitment research, not code: kept outside the repo because this one is public.
+CLUBS_FILE = Path.home() / ".clubs.json"
 PAD = 30  # minutes of slack after a final before a bumped workout starts
 
 TERM_START, TERM_END = dt.date(2026, 9, 24), dt.date(2026, 12, 4)
@@ -137,6 +139,30 @@ def events():
                 "description": desc + f"\nMoved off {s} -- a final exam owns that slot.",
             })
         out.append(body)
+    return out + clubs()
+
+
+
+
+def clubs():
+    # loud IOError if the file is gone -- silently pushing no club events would be worse
+    rows = json.loads(CLUBS_FILE.read_text())
+    out = []
+    for row in rows:
+        key, summary, ds, s, e, loc, note = row[:7]
+        d = dt.date.fromisoformat(ds)
+        ev = {"id": eid("club:" + key), "summary": summary, "location": loc,
+              "colorId": "9",              # Blueberry -- clubs read distinct from class/training
+              "description": note + "\nUCLA club recruitment, fall 2026."}
+        if s:
+            ev["start"] = {"dateTime": at(d, s), "timeZone": TZ}
+            ev["end"]   = {"dateTime": at(d, e), "timeZone": TZ}
+        else:
+            # Google all-day end date is EXCLUSIVE, so a one-day event ends tomorrow.
+            end = dt.date.fromisoformat(row[7]) if len(row) > 7 else d + dt.timedelta(days=1)
+            ev["start"] = {"date": d.isoformat()}
+            ev["end"]   = {"date": end.isoformat()}
+        out.append(ev)
     return out
 
 
@@ -173,7 +199,8 @@ if __name__ == "__main__":
     if "--push" not in sys.argv:
         for e in evs:
             rec = e.get("recurrence", ["one-off"])[0].replace("RRULE:", "")
-            print(f"  {e['summary']:28} {e['start']['dateTime'][:16]}  {rec}")
+            when = e["start"].get("dateTime", e["start"].get("date", ""))[:16]
+            print(f"  {e['summary']:36} {when:16}  {rec}")
         print(f"\n{len(evs)} events. Re-run with --push to write them.")
         raise SystemExit
 
