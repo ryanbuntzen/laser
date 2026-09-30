@@ -111,7 +111,6 @@ main{padding:0 16px 140px;max-width:640px;margin:0 auto;min-height:calc(100svh -
 .tunnel .c{font-size:26px;font-weight:600;line-height:1.25}
 .tunnel .box{width:32px;height:32px}
 .tunnel .grip,.tunnel .proj{display:none}
-.meta .blk{color:#4ca9ff;font-variant-numeric:tabular-nums;font-weight:600}
 .empty{text-align:center;color:var(--dim);padding:15vh 0;font-size:17px}
 /* calendar strip */
 .strip{display:flex;gap:5px;overflow-x:auto;padding:4px 0 12px;scrollbar-width:none}
@@ -484,25 +483,11 @@ function planDay(list, gaps) {
 }
 
 const mm2t = m => FMT_T.format(new Date(2000, 0, 1, Math.floor(m / 60), m % 60));
-const slotMap = plan => Object.fromEntries(plan.flatMap(b => b.tasks.map(x => [x.id, x])));
 const blockAt = (plan, mins) => plan.find(b => b.s <= mins && mins < b.en) || null;
-
-// The blocks plan_push.py wrote, in the shape planDay returns.
-function calPlan(written) {
-  return written.map(e => {
-    const s = evMins(e.start), en = e.end ? evMins(e.end) : s + 30;
-    return {s: s, en: en, tasks: (e.slotIds || "").split(",").filter(Boolean)
-      .map(id => ({id: String(id), s: s, en: en}))};
-  }).filter(b => b.tasks.length).sort((a, b) => a.s - b.s);
-}
 
 // Today's plan, built from the unfiltered list so it does not change with the mode.
 function todayPlan(list = tasks, today = iso(new Date())) {
-  // plan_push.py already planned today onto the calendar. Read that back rather
-  // than computing a second plan here -- one source of truth, no drift.
-  const written = eventsOn(today).filter(e => e.plan === today);
-  if (written.length) return calPlan(written);
-  const evs = eventsOn(today).filter(e => !e.allDay && e.plan !== today)
+  const evs = eventsOn(today).filter(e => !e.allDay)
     .map(e => ({s: evMins(e.start), en: e.end ? evMins(e.end) : evMins(e.start) + 60}));
   const [lo, hi] = dayWindow();
   const win = evs.length ? [Math.min(lo, ...evs.map(e => e.s)), Math.max(hi, ...evs.map(e => e.en))] : [lo, hi];
@@ -555,7 +540,7 @@ function renderTasks() {
   const q = localStorage.getItem(LS.q) || DEFAULT_Q;
   const g = effGroup(tasks);
   const now = new Date(), TODAY = iso(now);
-  const plan = todayPlan(tasks, TODAY), slots = slotMap(plan);
+  const plan = todayPlan(tasks, TODAY);
   const cur = blockAt(plan, nowMins(now));
   const shown = view(tasks, mode, getOrder(), g, TODAY, plan);
   const named = allViews().find(v => v[1] === q);
@@ -570,8 +555,8 @@ function renderTasks() {
 
   if (!shown.length) {
     const why = !tasks.length ? "All clear."
-      : mode !== "all" && plan.length && !cur ? "Nothing blocked right now — you are inside a calendar event."
-      : mode !== "all" && !plan.length ? "No plan today — connect the calendar, or nothing is due."
+      : mode !== "all" && plan.length && !cur ? "Nothing blocked right now, you are inside a calendar event."
+      : mode !== "all" && !plan.length ? "No plan today. Connect the calendar, or nothing is due."
       : "&#10003; nothing at this level";
     $("out").innerHTML = '<div class="empty">' + why + "</div>";
     return;
@@ -601,12 +586,12 @@ function renderTasks() {
         "</div>";
       section = label;
     }
-    html += taskRow(t, drag, g === "date", TODAY, g === "date" ? dkey(t) : "", slots[String(t.id)]);
+    html += taskRow(t, drag, g === "date", TODAY, g === "date" ? dkey(t) : "");
   }
   $("out").innerHTML = '<div id="list">' + html + "</div>";
 }
 
-function taskRow(t, drag, hideDue, today, dayk, slot) {
+function taskRow(t, drag, hideDue, today, dayk) {
   const p = prio(t);
   const due = t.due ? (t.due.string || FMT_MD.format(new Date(t.due.date.slice(0, 10) + "T00:00:00"))) : "";
   const od = t.due && t.due.date && t.due.date.slice(0, 10) < today;
@@ -617,7 +602,6 @@ function taskRow(t, drag, hideDue, today, dayk, slot) {
       'onpointermove="pressEnd()" onpointercancel="pressEnd()" onclick="bodyTap(\'' + t.id + '\')">' +
       '<div class="c">' + esc(t.content) + "</div>" +
     '<div class="meta">' +
-      (slot ? '<span class="blk">' + mm2t(slot.s) + "</span>" : "") +
       (t.due && t.due.is_recurring ? "\u21bb " : "") +
       (hideDue ? "" : (due ? '<span class="' + (od ? "od" : "") + '">' + esc(due) + "</span>" : "")) +
       (t.description ? "note" : "") +
@@ -706,6 +690,7 @@ async function loadEvents() {
       start: e.start.dateTime || e.start.date,
       end: e.end && (e.end.dateTime || e.end.date) || null,
       allDay: !e.start.dateTime,
+      gid: e.id,
       // plan_push.py stamps these on the blocks it writes; see todayPlan.
       plan: (e.extendedProperties && e.extendedProperties.private || {}).laserplan || null,
       slotIds: (e.extendedProperties && e.extendedProperties.private || {}).tasks || ""
@@ -927,9 +912,180 @@ function renderSettings() {
         '<button class="btn danger" onclick="gDisconnect()">Disconnect</button></div>'
       : '<p style="font-size:13px;color:var(--dim)">Show your Google Calendar events beside your tasks.</p>' +
         '<div class="row"><button class="btn primary" onclick="gConnect()">Connect Google Calendar</button></div>') +
+    '</div><div class="grp"><label>Events found in your mail</label>' +
+    propRows() +
+    '</div><div class="grp"><label>Automations</label>' +
+    '<p style="font-size:13px;color:var(--dim)">Times the Mac runs the daily jobs. ' +
+    'Saved into the Todoist config task; <span class="mono">dispatch.py</span> reads it ' +
+    'every 5 minutes.</p>' + autoRows() +
+    '<div class="row"><button class="btn primary" onclick="saveAuto()">Save schedule</button>' +
+    '</div>' +
     '</div><div class="grp"><label>Account</label>' +
     '<div class="row"><button class="btn" onclick="load()">Refresh</button>' +
     '<button class="btn danger" onclick="logout()">Forget token</button></div></div>';
+}
+
+/* ---------- events brief.py found in the mail, awaiting a yes ---------- */
+
+// brief.py parks proposals in a Todoist task; nothing it found is on the calendar
+// until you tap Add here. Dismiss just drops it from the list.
+const PROP_TASK = "proposed events (from email)";
+let props = null, propId = null;
+
+function propRows() {
+  if (!props) { loadProps(); return '<p style="font-size:13px;color:var(--dim)">Loading\u2026</p>'; }
+  if (!props.length) return '<p style="font-size:13px;color:var(--dim)">Nothing new in your mail.</p>';
+  return props.map((e, i) =>
+    '<div class="opt" style="cursor:default"><div style="flex:1">' +
+    "<b>" + esc(e.title) + "</b><span>" + esc(e.date + (e.time ? " " + e.time : " (all day)")) +
+    " \u00b7 " + esc(e.from) + "</span></div>" +
+    '<button class="btn primary" onclick="propAdd(' + i + ')">Add</button>' +
+    '<button class="btn" onclick="propDrop(' + i + ')">Dismiss</button></div>').join("");
+}
+
+async function loadProps() {
+  try {
+    const d = await api("/tasks/filter?query=" + encodeURIComponent("search: proposed events"));
+    const t = (d.results || d || []).find(x => x.content.startsWith(PROP_TASK));
+    props = t ? JSON.parse(t.description || "[]") : [];
+    propId = t ? t.id : null;
+    render();
+  } catch (e) { props = []; err("Proposals: " + e.message); }
+}
+
+async function saveProps() {
+  if (!propId) return;
+  await api("/tasks/" + propId, {method: "POST",
+    body: JSON.stringify({description: JSON.stringify(props, null, 1)})});
+}
+
+async function propDrop(i) { props.splice(i, 1); render(); await saveProps(); }
+
+async function propAdd(i) {
+  const e = props[i];
+  if (!gToken) { err("Connect Google Calendar first"); return; }
+  // No time means an all-day event -- Google wants date-only fields for those, and
+  // the end date is exclusive, hence the +1 day.
+  const body = e.time
+    ? {summary: e.title, description: "From email: " + e.from,
+       start: {dateTime: e.date + "T" + e.time + ":00", timeZone: TZ},
+       end: {dateTime: e.date + "T" + addMins(e.time, 60) + ":00", timeZone: TZ}}
+    : {summary: e.title, description: "From email: " + e.from,
+       start: {date: e.date}, end: {date: nextDay(e.date)}};
+  try {
+    const r = await fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events",
+      {method: "POST", headers: {Authorization: "Bearer " + gToken,
+       "Content-Type": "application/json"}, body: JSON.stringify(body)});
+    if (!r.ok) throw new Error(r.status + " " + (await r.text()).slice(0, 140));
+    toast("Added to calendar");
+    props.splice(i, 1); render();
+    await saveProps();
+    loadEvents();
+  } catch (x) { err("Add failed: " + x.message); }
+}
+
+const TZ = "America/Los_Angeles";
+const addMins = (hhmm, n) => {
+  const [h, m] = hhmm.split(":").map(Number), t = h * 60 + m + n;
+  return String(Math.floor(t / 60) % 24).padStart(2, "0") + ":" + String(t % 60).padStart(2, "0");
+};
+const nextDay = d => { const x = new Date(d + "T00:00:00"); x.setDate(x.getDate() + 1); return iso(x); };
+
+/* ---------- automations: the schedule dispatch.py runs, stored in Todoist ---------- */
+
+// The config lives in one Todoist task's description as JSON. Laser can reach that;
+// it can never reach launchd on the Mac, which is the whole reason for the detour.
+const AUTO_TASK = "automations (config";
+let autoCfg = null, autoId = null;
+
+const AUTO_LABEL = {email: "Email triage", brief: "Daily brief \u2192 phone", plan: "Push tasks to Todoist",
+  "contribute-swensen": "Swensen contribution", "contribute-deepseek": "DeepSeek contribution",
+  "rebalance-swensen": "Annual rebalance", "deepseek-check": "DeepSeek holdings check"};
+const A_MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+// Mon=0, matching Python's weekday() so dispatch.py needs no conversion.
+const A_DOW = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+
+// How often a job runs, as the short string the repeat box round-trips.
+function repeatLabel(j) {
+  if (j.month && j.dom) return A_MON[j.month - 1] + " " + j.dom;
+  if (j.dom) return "day " + j.dom;
+  if (j.dow !== undefined && j.dow !== null) return A_DOW[j.dow];
+  return "daily";
+}
+
+// "daily" | "day 5" | "Jan 5" | "Thu" -- anything else leaves the job untouched,
+// because a half-parsed schedule is worse than the one already saved.
+function parseRepeat(raw) {
+  const t = (raw || "").trim();
+  if (/^daily$/i.test(t)) return {};
+  let m = t.match(/^day\s+(\d{1,2})$/i);
+  if (m && +m[1] >= 1 && +m[1] <= 28) return {dom: +m[1]};
+  m = t.match(/^([a-z]{3})\s+(\d{1,2})$/i);
+  if (m && A_MON.findIndex(x => x.toLowerCase() === m[1].toLowerCase()) >= 0 && +m[2] <= 28)
+    return {month: A_MON.findIndex(x => x.toLowerCase() === m[1].toLowerCase()) + 1, dom: +m[2]};
+  const d = A_DOW.findIndex(x => x.toLowerCase() === t.toLowerCase());
+  if (d >= 0) return {dow: d};
+  return null;
+}
+
+function autoRows() {
+  if (!autoCfg) { loadAuto(); return '<p style="font-size:13px;color:var(--dim)">Loading\u2026</p>'; }
+  return Object.entries(autoCfg).map(([name, j]) =>
+    '<div class="opt" aria-pressed="' + (j.on !== false) + '" style="cursor:default">' +
+    '<div class="dot" onclick="autoToggle(\'' + name + '\')" style="cursor:pointer"></div>' +
+    '<div style="flex:1"><b>' + esc(AUTO_LABEL[j.cmd] || name) + "</b>" +
+    '<div class="row" style="margin-top:6px">' +
+    '<input type="text" class="mono" style="flex:2" value="' + esc((j.at || []).join(", ")) +
+    '" onchange="autoTimes(\'' + name + '\', this.value)" placeholder="07:30, 13:00">' +
+    '<input type="text" class="mono" style="flex:1" value="' + esc(repeatLabel(j)) +
+    '" onchange="autoRepeat(\'' + name + '\', this.value)" placeholder="daily">' +
+    "</div></div></div>").join("") +
+    '<p style="font-size:13px;color:var(--dim)">Repeat: <span class="mono">daily</span>, ' +
+    '<span class="mono">day 5</span> (monthly), <span class="mono">Jan 5</span> (yearly), ' +
+    '<span class="mono">Thu</span>. Contributions only propose orders \u2014 ' +
+    'approving them stays manual.</p>';
+}
+
+async function loadAuto() {
+  try {
+    const d = await api("/tasks/filter?query=" + encodeURIComponent("search: automations"));
+    const t = (d.results || d || []).find(x => x.content.startsWith(AUTO_TASK));
+    if (!t) { err("No automations config task in Todoist"); return; }
+    autoId = t.id; autoCfg = JSON.parse(t.description);
+    render();
+  } catch (e) { err("Automations: " + e.message); }
+}
+
+async function autoToggle(name) {
+  const j = autoCfg[name];
+  j.on = j.on === false;
+  render();
+  await saveAuto();
+}
+
+function autoRepeat(name, raw) {
+  const r = parseRepeat(raw);
+  if (!r) { err('Repeat must be "daily", "day 5", "Jan 5" or a weekday like "Thu"'); render(); return; }
+  const j = autoCfg[name];
+  delete j.dom; delete j.month; delete j.dow;
+  Object.assign(j, r);
+  render();
+}
+
+// Only HH:MM survives -- dispatch.py splits on ":" and would throw on anything else.
+function autoTimes(name, raw) {
+  autoCfg[name].at = raw.split(",").map(x => x.trim())
+    .filter(x => /^([01]?\d|2[0-3]):[0-5]\d$/.test(x))
+    .map(x => x.length === 4 ? "0" + x : x);
+}
+
+async function saveAuto() {
+  try {
+    await api("/tasks/" + autoId, {method: "POST",
+      body: JSON.stringify({description: JSON.stringify(autoCfg, null, 1)})});
+    toast("Schedule saved");
+    render();
+  } catch (e) { err("Save failed: " + e.message); }
 }
 
 /* ---------- long press menu ---------- */
@@ -1658,13 +1814,7 @@ function selftest() {
      "a task too big for gap one moves whole to a gap that holds it");
   ok(planDay(TT,[]).length===0, "no gaps means no plan, not a crash");
 
-  // calPlan: the blocks plan_push.py wrote are the plan, drift-free
-  const CP = calPlan([{start:"2026-01-02T14:53:00", end:"2026-01-02T17:08:00", slotIds:"a,b"},
-                      {start:"2026-01-02T09:00:00", end:"2026-01-02T09:30:00", slotIds:""}]);
-  ok(CP.length===1, "a block naming no tasks is not a plan block");
-  ok(CP[0].tasks.length===2 && CP[0].tasks[0].s===893,
-     "every task in a chore block shares the block's start time");
-  ok(slotMap(CP).b.s===893, "the blue slot time comes straight off the calendar");
+
 
   const PL = [{s:540,en:600,tasks:[{id:"1",s:540,en:570},{id:"2",s:570,en:600}]},
               {s:660,en:780,tasks:[{id:"3",s:660,en:690}]}];
