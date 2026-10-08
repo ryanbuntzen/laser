@@ -279,6 +279,9 @@ textarea{resize:vertical;min-height:60px}
     <div class="drow editonly" onclick="openDate()"><span class="ic">&#9638;</span>
       <span id="e_duetxt" style="flex:1">No date</span><span style="color:var(--dim)">&#8250;</span></div>
     <input type="hidden" id="e_due">
+    <div class="drow editonly"><span class="ic">&#9200;</span>
+      <span style="color:var(--dim)">Deadline</span>
+      <input type="date" id="e_dl" style="flex:1;text-align:right" aria-label="Deadline"></div>
     <div class="drow editonly"><span class="ic">&#9873;</span><div class="seg" id="e_prio"></div></div>
   </div>
   <div class="chips editonly">
@@ -425,6 +428,13 @@ function effGroup(list) {
 }
 
 const overdue = (t, today) => !!(t.due && t.due.date && t.due.date.slice(0, 10) < today);
+
+// Todoist's own deadline field is 403 PREMIUM_ONLY on a free account, so a deadline rides on
+// a label: @due-YYYY-MM-DD. Quick add takes it typed, and Todoist's apps see a plain label.
+const DL = /^due-(\d{4}-\d{2}-\d{2})$/;
+const deadline = t => ((t.labels || []).find(l => DL.test(l)) || "").slice(4);
+const withDeadline = (labels, d) => [...labels.filter(l => !DL.test(l)), ...(d ? ["due-" + d] : [])];
+const daysLeft = (d, today) => Math.round((new Date(d + "T00:00:00") - new Date(today + "T00:00:00")) / 864e5);
 
 /* ---------- auto time-blocking ---------- */
 
@@ -596,6 +606,7 @@ function taskRow(t, drag, hideDue, today, dayk) {
   const due = t.due ? (t.due.string || FMT_MD.format(new Date(t.due.date.slice(0, 10) + "T00:00:00"))) : "";
   const od = t.due && t.due.date && t.due.date.slice(0, 10) < today;
   const pj = projMap[t.project_id];
+  const dl = deadline(t), lab = (t.labels || []).filter(l => !DL.test(l));
   return '<div class="t" style="--pc:' + PCOL[p] + '" data-id="' + t.id + '" data-k="' + dayk + "|" + p + '">' +
     '<button class="box" onclick="done(this)" aria-label="Complete"></button>' +
     '<div class="body" onpointerdown="pressStart(event,\'' + t.id + '\')" onpointerup="pressEnd()" ' +
@@ -605,7 +616,9 @@ function taskRow(t, drag, hideDue, today, dayk) {
       (t.due && t.due.is_recurring ? "\u21bb " : "") +
       (hideDue ? "" : (due ? '<span class="' + (od ? "od" : "") + '">' + esc(due) + "</span>" : "")) +
       (t.description ? "note" : "") +
-      (t.labels && t.labels.length ? "@" + t.labels.length : "") +
+      (dl ? '<span class="' + (daysLeft(dl, today) <= 2 ? "od" : "") + '">\u23f0 ' +
+            esc(FMT_MD.format(new Date(dl + "T00:00:00"))) + "</span>" : "") +
+      (lab.length ? "@" + lab.length : "") +
       (pj ? '<span class="proj">' + esc(pj.n) + ' <b style="color:' +
             (PROJCOL[pj.c] || "var(--dim)") + '">#</b></span>' : "") +
     "</div></div>" +
@@ -1099,12 +1112,12 @@ function pressStart(e, id) {
 const pressEnd = () => clearTimeout(pressT);
 function bodyTap(id) { if (pressed) { pressed = false; return; } openSheet(id); }
 
-// Deadline is deliberately absent: the API returns 403 PREMIUM_ONLY on a free account.
 function openMenu(id) {
   const t = tasks.find(x => String(x.id) === String(id));
   if (!t) return;
   const items = [
     ["&#9638;", "Schedule", "menuField('e_due')", ""],
+    ["&#9200;", "Deadline", "menuField('e_dl')", ""],
     ["&#8677;", "Move to project", "menuField('e_proj')", ""],
     ["&#9873;", "Priority", "menuField('e_prio')", ""],
     ["&#10697;", "Duplicate task", "dupTask('" + t.id + "')", "sep"],
@@ -1172,6 +1185,7 @@ function openSheet(id) {
   editPrio = editing ? prio(editing) : 1;
   duePostpone = false;
   editLabels = editing ? [...(editing.labels || [])] : [];
+  $("e_dl").value = editing ? deadline(editing) : "";
   $("e_prio").innerHTML = [4, 3, 2, 1].map(p =>
     '<button data-p="' + p + '" onclick="setPrio(' + p + ')">' + PNAME[p] + "</button>").join("");
   paintPrio();
@@ -1184,7 +1198,7 @@ function openSheet(id) {
   $("x_desc").classList.toggle("hide", !(editing && editing.description));
   $("c_desc").setAttribute("aria-pressed", !!(editing && editing.description));
   $("x_lab").classList.add("hide");
-  $("c_lab").setAttribute("aria-pressed", editLabels.length > 0);
+  $("c_lab").setAttribute("aria-pressed", editLabels.some(l => !DL.test(l)));
   paintLabels();
   if (editing) $("e_box").style.setProperty("--pc", PCOL[prio(editing)]);
   renderSubs();
@@ -1214,7 +1228,7 @@ function toggleExtra(k) {
   $(k === "desc" ? "c_desc" : "c_lab").setAttribute("aria-pressed", !el.classList.contains("hide"));
 }
 function paintLabels() {
-  $("x_lab").innerHTML = labels.map(l =>
+  $("x_lab").innerHTML = labels.filter(l => !DL.test(l.name)).map(l =>
     '<button class="chip" aria-pressed="' + editLabels.includes(l.name) + '" onclick="toggleLabel(\'' +
     esc(l.name).replace(/'/g, "") + '\')">' + esc(l.name) + "</button>").join("") ||
     '<span style="color:var(--dim);font-size:13px">No labels defined in Todoist.</span>';
@@ -1258,7 +1272,7 @@ async function saveTask() {
   try {
     if (editing) {
       body.description = $("e_desc").value;
-      body.labels = editLabels;
+      body.labels = withDeadline(editLabels, $("e_dl").value);
       await api("/tasks/" + editing.id, {method: "POST", body: JSON.stringify(body)});
       // Moving one occurrence of a recurring task: only sync accepts a due object.
       if (act.moveOccurrence)
@@ -1847,6 +1861,14 @@ function selftest() {
   ok(Object.keys(dueAction("every monday","2026-08-31","2026-08-31",false,false)).length===0,
      "an untouched due sends nothing, so recurrence is never disturbed");
   ok(dueAction(null,"tomorrow","",false,true).due_string==="tomorrow", "a new task sends what was typed");
+
+  ok(deadline({labels:["School","due-2026-10-20"]})==="2026-10-20", "a due- label reads as the deadline");
+  ok(deadline({labels:["due-soon"]})==="" && deadline({})==="", "no deadline label means no deadline");
+  ok(withDeadline(["School","due-2026-10-20"],"2026-11-01").join()==="School,due-2026-11-01",
+     "setting a deadline replaces the old one and keeps other labels");
+  ok(withDeadline(["School","due-2026-10-20"],"").join()==="School", "clearing it drops the label");
+  ok(daysLeft("2026-10-10","2026-10-08")===2 && daysLeft("2026-10-07","2026-10-08")===-1,
+     "days left counts whole calendar days either side");
 
   const EVS = [{title:"gym", s:600, en:660}, {title:"lunch", s:780, en:825}];
   ok(nowState(EVS, 630).live && nowState(EVS, 630).e.title==="gym", "an event in progress is the live one");
